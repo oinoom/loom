@@ -7,7 +7,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
+	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
@@ -395,11 +397,71 @@ func resolveRepo(repoArg string) (string, string, error) {
 		}
 		return parts[0], parts[1], nil
 	}
+	if owner, name, ok := inferRepoFromUpstream(); ok {
+		return owner, name, nil
+	}
 	repo, err := repository.Current()
 	if err != nil {
 		return "", "", err
 	}
 	return repo.Owner, repo.Name, nil
+}
+
+func inferRepoFromUpstream() (string, string, bool) {
+	upstream, err := runGit("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+	if err != nil {
+		return "", "", false
+	}
+	parts := strings.SplitN(strings.TrimSpace(upstream), "/", 2)
+	if len(parts) != 2 || parts[0] == "" {
+		return "", "", false
+	}
+	remoteName := parts[0]
+	remoteURL, err := runGit("remote", "get-url", remoteName)
+	if err != nil {
+		return "", "", false
+	}
+	owner, name, ok := parseGitHubRepo(remoteURL)
+	if !ok {
+		return "", "", false
+	}
+	return owner, name, true
+}
+
+func runGit(args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+func parseGitHubRepo(raw string) (string, string, bool) {
+	raw = strings.TrimSpace(raw)
+	raw = strings.TrimSuffix(raw, ".git")
+	if strings.HasPrefix(raw, "git@") {
+		parts := strings.SplitN(raw, ":", 2)
+		if len(parts) != 2 {
+			return "", "", false
+		}
+		path := strings.TrimPrefix(parts[1], "/")
+		p := strings.Split(path, "/")
+		if len(p) < 2 {
+			return "", "", false
+		}
+		return p[len(p)-2], p[len(p)-1], true
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", "", false
+	}
+	path := strings.Trim(u.Path, "/")
+	p := strings.Split(path, "/")
+	if len(p) < 2 {
+		return "", "", false
+	}
+	return p[len(p)-2], p[len(p)-1], true
 }
 
 func fetchReviewThreads(owner, repo string, pr int) ([]threadRecord, error) {
