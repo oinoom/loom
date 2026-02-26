@@ -283,11 +283,13 @@ func runReply(args []string) error {
 	var commentID int64
 	var body string
 	var bodyFile string
+	var jsonOut bool
 	fs.StringVar(&repoArg, "repo", "", "owner/name repository")
 	fs.IntVar(&pr, "pr", 0, "pull request number")
 	fs.Int64Var(&commentID, "comment", 0, "pull request review comment database ID")
 	fs.StringVar(&body, "body", "", "reply text")
 	fs.StringVar(&bodyFile, "body-file", "", "read reply text from file")
+	fs.BoolVar(&jsonOut, "json", false, "output JSON")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -326,6 +328,16 @@ func runReply(args []string) error {
 	if err := client.Post(path, bytes.NewReader(bodyBytes), &out); err != nil {
 		return err
 	}
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(map[string]interface{}{
+			"action":     "reply",
+			"comment_id": commentID,
+			"reply_id":   out.ID,
+			"url":        out.HTMLURL,
+		})
+	}
 	fmt.Printf("replied: comment=%d reply=%d %s\n", commentID, out.ID, out.HTMLURL)
 	return nil
 }
@@ -333,7 +345,9 @@ func runReply(args []string) error {
 func runResolve(args []string, undo bool) error {
 	fs := flag.NewFlagSet("resolve", flag.ContinueOnError)
 	var threadID string
+	var jsonOut bool
 	fs.StringVar(&threadID, "thread", "", "review thread node ID (PRRT_...)")
+	fs.BoolVar(&jsonOut, "json", false, "output JSON")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -352,6 +366,18 @@ func runResolve(args []string, undo bool) error {
 	var out map[string]any
 	if err := gql.Do(query, vars, &out); err != nil {
 		return err
+	}
+	if jsonOut {
+		action := "resolve"
+		if undo {
+			action = "unresolve"
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(map[string]interface{}{
+			"action":    action,
+			"thread_id": threadID,
+		})
 	}
 	if undo {
 		fmt.Printf("unresolved: %s\n", threadID)

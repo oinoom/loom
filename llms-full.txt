@@ -1,0 +1,65 @@
+# loom (full context)
+
+loom is built for review-comment workflows in GitHub pull requests.
+
+Primary use cases:
+
+1. Enumerate unresolved review threads
+2. Filter by path/author/severity/text
+3. Reply with status/resolution comments
+4. Resolve/unresolve threads
+5. Re-check unresolved count until zero
+
+## Commands
+
+### List threads
+
+`loom list --pr <number> [flags]`
+
+Flags:
+
+- `--repo owner/repo` (optional, inferred from upstream git remote)
+- `--state unresolved|resolved|all` (default: unresolved)
+- `--path <substring>`
+- `--author <login>`
+- `--contains <text>`
+- `--severity critical|major|minor`
+- `--sort updated|created|path|line|author|severity` (default: updated)
+- `--desc` (default: true)
+- `--limit <n>`
+- `--json`
+- `--stats`
+
+### Find comments by query
+
+`loom find --pr <number> --query <text> [flags]`
+
+`find` accepts all main filter/sort/output flags from `list`.
+
+### Reply
+
+`loom reply --pr <number> --comment <database-id> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+
+If `--body` and `--body-file` are omitted, stdin is used.
+
+### Resolve
+
+`loom resolve --thread <PRRT_...> [--json]`
+
+### Unresolve
+
+`loom unresolve --thread <PRRT_...> [--json]`
+
+## Output conventions
+
+- Human mode: tabular output for `list/find`; short status lines for action commands.
+- JSON mode:
+  - `list/find`: array of thread records
+  - `reply`: object with action/comment_id/reply_id/url
+  - `resolve/unresolve`: object with action/thread_id
+
+## Operational notes
+
+- Requires authenticated `gh` session.
+- Uses GitHub GraphQL for thread data and resolve mutations.
+- Uses GitHub REST endpoint for review comment replies.

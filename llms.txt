@@ -1,0 +1,17 @@
+# loom
+
+loom is a CLI for triaging and actioning GitHub PR review comments.
+
+## Docs
+
+- README: ./README.md
+- LLM Integration Guide: ./docs/LLM_GUIDE.md
+- Skill: ./skills/loom-pr-comments/SKILL.md
+
+## Key commands
+
+- `loom list --pr <n> [--repo owner/repo] [--json]`
+- `loom find --pr <n> --query <text> [--repo owner/repo] [--json]`
+- `loom reply --pr <n> --comment <id> --body <text> [--repo owner/repo] [--json]`
+- `loom resolve --thread <PRRT_...> [--json]`
+- `loom unresolve --thread <PRRT_...> [--json]`

@@ -2,6 +2,7 @@
 
 `loom` is a fast CLI for triaging and actioning GitHub PR review comments.
 It is designed for high-volume review loops (find/sift/sort/reply/resolve).
+It is also designed to be automation/LLM-friendly.
 
 ## What it does
 
@@ -10,6 +11,12 @@ It is designed for high-volume review loops (find/sift/sort/reply/resolve).
 - Sorts by updated/created/path/line/author/severity
 - Replies to review comments by DB comment ID
 - Resolves/unresolves review threads by GraphQL thread ID
+
+## LLM-first docs
+
+- [llms.txt](./llms.txt)
+- [llms-full.txt](./llms-full.txt)
+- [docs/LLM_GUIDE.md](./docs/LLM_GUIDE.md)
 
 ## Requirements
 
@@ -85,6 +92,13 @@ Resolve / unresolve a thread:
 ```bash
 loom resolve --thread PRRT_kwDORR607s5w3N_2
 loom unresolve --thread PRRT_kwDORR607s5w3N_2
+```
+
+JSON output for action commands:
+
+```bash
+loom reply --repo ryuvel/tacara --pr 24 --comment 2857259586 --body "Addressed in <commit-url>" --json
+loom resolve --thread PRRT_kwDORR607s5w3N_2 --json
 ```
 
 JSON output (for scripting):
