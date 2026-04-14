@@ -20,11 +20,12 @@ import (
 	"github.com/cli/go-gh/v2/pkg/repository"
 )
 
-const usage = `loom - sift and action GitHub PR review comments quickly
+const usage = `loom - sift and action GitHub PR comments quickly
 
 Usage:
   loom list --pr <number> [flags]
   loom find --pr <number> --query <text> [flags]
+  loom comment --pr <number> (--body <text> | --body-file <file>)
   loom reply --pr <number> --comment <id> (--body <text> | --body-file <file>)
   loom resolve --thread <node-id>
   loom unresolve --thread <node-id>
@@ -36,6 +37,7 @@ Examples:
   loom list --repo ryuvel/tacara --pr 24
   loom list --pr 24 --state unresolved --severity major --sort created --desc
   loom find --pr 24 --query "stale rows" --path tacara-indexer/src/main.rs
+  loom comment --pr 24 --body "Top-level PR note"
   loom reply --pr 24 --comment 2857259586 --body "Addressed in <commit-url>"
   loom resolve --thread PRRT_kwDORR607s5w3N_2
 `
@@ -177,6 +179,8 @@ func main() {
 		err = runList(args, "")
 	case "find":
 		err = runFind(args)
+	case "comment":
+		err = runComment(args)
 	case "reply":
 		err = runReply(args)
 	case "resolve":
@@ -273,6 +277,67 @@ func executeList(opts listOptions) error {
 		return enc.Encode(records)
 	}
 	printTable(records)
+	return nil
+}
+
+func runComment(args []string) error {
+	fs := flag.NewFlagSet("comment", flag.ContinueOnError)
+	var repoArg string
+	var pr int
+	var body string
+	var bodyFile string
+	var jsonOut bool
+	fs.StringVar(&repoArg, "repo", "", "owner/name repository")
+	fs.IntVar(&pr, "pr", 0, "pull request number")
+	fs.StringVar(&body, "body", "", "comment text")
+	fs.StringVar(&bodyFile, "body-file", "", "read comment text from file")
+	fs.BoolVar(&jsonOut, "json", false, "output JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if pr <= 0 {
+		return errors.New("--pr is required")
+	}
+	text, err := resolveBodyText(body, bodyFile)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(text) == "" {
+		return errors.New("comment body is empty")
+	}
+
+	owner, repo, err := resolveRepo(repoArg)
+	if err != nil {
+		return err
+	}
+	client, err := api.DefaultRESTClient()
+	if err != nil {
+		return err
+	}
+	path := fmt.Sprintf("repos/%s/%s/issues/%d/comments", owner, repo, pr)
+	req := map[string]string{"body": text}
+	bodyBytes, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
+	var out struct {
+		ID      int64  `json:"id"`
+		HTMLURL string `json:"html_url"`
+	}
+	if err := client.Post(path, bytes.NewReader(bodyBytes), &out); err != nil {
+		return err
+	}
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(map[string]interface{}{
+			"action":     "comment",
+			"pr":         pr,
+			"comment_id": out.ID,
+			"url":        out.HTMLURL,
+		})
+	}
+	fmt.Printf("commented: pr=%d comment=%d %s\n", pr, out.ID, out.HTMLURL)
 	return nil
 }
 

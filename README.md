@@ -1,7 +1,7 @@
 # loom
 
-`loom` is a fast CLI for triaging and actioning GitHub PR review comments.
-It is designed for high-volume review loops (find/sift/sort/reply/resolve).
+`loom` is a fast CLI for triaging and actioning GitHub PR comments.
+It is designed for high-volume review loops across top-level PR comments and review threads.
 It is also designed to be automation/LLM-friendly.
 
 ## What it does
@@ -9,6 +9,7 @@ It is also designed to be automation/LLM-friendly.
 - Lists PR review threads (default: unresolved only)
 - Filters by path/author/severity/text
 - Sorts by updated/created/path/line/author/severity
+- Posts top-level PR conversation comments
 - Replies to review comments by DB comment ID
 - Resolves/unresolves review threads by GraphQL thread ID
 
@@ -81,6 +82,12 @@ Include grouped stats:
 loom list --repo ryuvel/tacara --pr 24 --state unresolved --stats
 ```
 
+Comment on a PR:
+
+```bash
+loom comment --repo ryuvel/tacara --pr 24 --body "Top-level PR note"
+```
+
 Reply to a review comment:
 
 ```bash
@@ -97,6 +104,7 @@ loom unresolve --thread PRRT_kwDORR607s5w3N_2
 JSON output for action commands:
 
 ```bash
+loom comment --repo ryuvel/tacara --pr 24 --body "Top-level PR note" --json
 loom reply --repo ryuvel/tacara --pr 24 --comment 2857259586 --body "Addressed in <commit-url>" --json
 loom resolve --thread PRRT_kwDORR607s5w3N_2 --json
 ```
