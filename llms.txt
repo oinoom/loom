@@ -16,6 +16,9 @@ loom is a CLI for triaging and actioning GitHub PR comments.
 - `loom comment --pr <n> --path <file> --line <n> --side RIGHT (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
 - `loom comment --pr <n> --path <file> --start-line <n> --start-side RIGHT --line <n> --side RIGHT (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
 - `loom comment --pr <n> --path <file> --subject file (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+- `loom edit --comment <id> (--body <text> | --body-file <path>) [--repo owner/repo] [--type auto|review|top-level] [--json]`
+- `loom delete --comment <id> [--repo owner/repo] [--type auto|review|top-level] [--json]`
+- `loom merge --pr <n> [--repo owner/repo] [--method merge|squash|rebase] [--json]`
 - `loom reply --pr <n> --comment <id> --body <text> [--repo owner/repo] [--json]`
 - `loom resolve --thread <PRRT_...> [--json]`
 - `loom unresolve --thread <PRRT_...> [--json]`

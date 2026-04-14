@@ -7,9 +7,11 @@ Primary use cases:
 1. Enumerate unresolved review threads
 2. Filter by path/author/severity/text
 3. Leave top-level or inline PR comments when needed
-4. Reply with status/resolution comments
-5. Resolve/unresolve threads
-6. Re-check unresolved count until zero
+4. Edit or delete mistaken comments without dropping to raw API calls
+5. Reply with status/resolution comments
+6. Resolve/unresolve threads
+7. Merge the PR when review state is clean
+8. Re-check unresolved count until zero
 
 ## Commands
 
@@ -51,6 +53,24 @@ For inline review comments, add:
 
 If `--commit` is omitted for an inline comment, loom uses the PR head SHA automatically.
 
+### Edit
+
+`loom edit --comment <database-id> (--body <text> | --body-file <path>) [--repo owner/repo] [--type auto|review|top-level] [--json]`
+
+If `--type` is omitted, loom tries review comments first and then top-level PR conversation comments.
+
+### Delete
+
+`loom delete --comment <database-id> [--repo owner/repo] [--type auto|review|top-level] [--json]`
+
+If `--type` is omitted, loom tries review comments first and then top-level PR conversation comments.
+
+### Merge
+
+`loom merge --pr <number> [--repo owner/repo] [--method merge|squash|rebase] [--json]`
+
+If `--method` is omitted, loom uses `squash`.
+
 ### Reply
 
 `loom reply --pr <number> --comment <database-id> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
@@ -71,6 +91,9 @@ If `--body` and `--body-file` are omitted, stdin is used.
 - JSON mode:
   - `list/find`: array of thread records
   - `comment`: object with action/pr/comment_id/url
+  - `edit`: object with action/type/comment_id/url
+  - `delete`: object with action/type/comment_id
+  - `merge`: object with action/pr/method/merged/sha/message
   - `reply`: object with action/comment_id/reply_id/url
   - `resolve/unresolve`: object with action/thread_id
 
@@ -80,4 +103,6 @@ If `--body` and `--body-file` are omitted, stdin is used.
 - Uses GitHub GraphQL for thread data and resolve mutations.
 - Uses GitHub REST issue comments endpoint for top-level PR comments.
 - Uses GitHub REST pull request review comments endpoint for inline/file/range comments.
+- Uses GitHub REST issue and review comment endpoints for edit/delete auto-detection.
+- Uses GitHub REST merge endpoint for PR merges.
 - Uses GitHub REST endpoint for review comment replies.

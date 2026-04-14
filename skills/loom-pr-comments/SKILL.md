@@ -1,6 +1,6 @@
 ---
 name: loom-pr-comments
-description: Use this skill when triaging, filtering, commenting on, replying to, or resolving GitHub PR review comments. Trigger for requests like "address PR comments", "show unresolved review threads", "leave a PR comment", "reply and resolve comments", or "find comments by file/severity/author". Uses the `loom` CLI for fast list/find/comment/reply/resolve workflows.
+description: Use this skill when triaging, filtering, commenting on, editing, deleting, replying to, or resolving GitHub PR review comments. Trigger for requests like "address PR comments", "show unresolved review threads", "leave a PR comment", "fix that comment", "delete that comment", "reply and resolve comments", or "find comments by file/severity/author". Uses the `loom` CLI for fast list/find/comment/edit/delete/reply/resolve workflows.
 ---
 
 # Loom PR Comments
@@ -31,18 +31,26 @@ Use `loom` to handle GitHub PR comments quickly.
   - `loom comment --repo <owner/repo> --pr <number> --path <file> --start-line <n> --start-side RIGHT --line <n> --side RIGHT --body "<message>"`
 - Leave a file-level PR review comment:
   - `loom comment --repo <owner/repo> --pr <number> --path <file> --subject file --body "<message>"`
+- Edit an existing PR comment by database ID:
+  - `loom edit --repo <owner/repo> --comment <database-comment-id> --body "<message>"`
+- Delete an existing PR comment by database ID:
+  - `loom delete --repo <owner/repo> --comment <database-comment-id>`
 - Reply to a review comment:
   - `loom reply --repo <owner/repo> --pr <number> --comment <database-comment-id> --body "<message>"`
 - Resolve/unresolve a thread:
   - `loom resolve --thread <PRRT_...>`
   - `loom unresolve --thread <PRRT_...>`
+- Merge a PR after review is complete:
+  - `loom merge --repo <owner/repo> --pr <number> --method squash`
 
 ## Typical Workflow
 
 1. `loom list` unresolved comments.
 2. Group with `--stats`, narrow with `--path`, `--author`, `--severity`.
 3. Leave a top-level or inline PR note with `loom comment` when needed.
-4. Implement fixes.
-5. Reply with commit links via `loom reply`.
-6. Resolve threads with `loom resolve`.
-7. Re-run `loom list --state unresolved` and ensure the table is empty.
+4. If you need to correct or remove your own comment, use `loom edit` or `loom delete`.
+5. Implement fixes.
+6. Reply with commit links via `loom reply`.
+7. Resolve threads with `loom resolve`.
+8. If the user asks to merge and the review state is clear, use `loom merge`.
+9. Re-run `loom list --state unresolved` and ensure the table is empty.
