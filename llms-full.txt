@@ -1,14 +1,15 @@
 # loom (full context)
 
-loom is built for review-comment workflows in GitHub pull requests.
+loom is built for PR comment workflows in GitHub pull requests.
 
 Primary use cases:
 
 1. Enumerate unresolved review threads
 2. Filter by path/author/severity/text
-3. Reply with status/resolution comments
-4. Resolve/unresolve threads
-5. Re-check unresolved count until zero
+3. Leave top-level or inline PR comments when needed
+4. Reply with status/resolution comments
+5. Resolve/unresolve threads
+6. Re-check unresolved count until zero
 
 ## Commands
 
@@ -36,6 +37,20 @@ Flags:
 
 `find` accepts all main filter/sort/output flags from `list`.
 
+### Comment
+
+`loom comment --pr <number> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+
+If `--body` and `--body-file` are omitted, stdin is used.
+
+For inline review comments, add:
+
+- `--path <file>` plus `--line <n> --side LEFT|RIGHT` for single-line comments
+- `--path <file> --start-line <n> --start-side LEFT|RIGHT --line <n> --side LEFT|RIGHT` for range comments
+- `--path <file> --subject file` for file-level comments
+
+If `--commit` is omitted for an inline comment, loom uses the PR head SHA automatically.
+
 ### Reply
 
 `loom reply --pr <number> --comment <database-id> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
@@ -55,6 +70,7 @@ If `--body` and `--body-file` are omitted, stdin is used.
 - Human mode: tabular output for `list/find`; short status lines for action commands.
 - JSON mode:
   - `list/find`: array of thread records
+  - `comment`: object with action/pr/comment_id/url
   - `reply`: object with action/comment_id/reply_id/url
   - `resolve/unresolve`: object with action/thread_id
 
@@ -62,4 +78,6 @@ If `--body` and `--body-file` are omitted, stdin is used.
 
 - Requires authenticated `gh` session.
 - Uses GitHub GraphQL for thread data and resolve mutations.
+- Uses GitHub REST issue comments endpoint for top-level PR comments.
+- Uses GitHub REST pull request review comments endpoint for inline/file/range comments.
 - Uses GitHub REST endpoint for review comment replies.
