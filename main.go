@@ -26,6 +26,8 @@ Usage:
   loom list --pr <number> [flags]
   loom find --pr <number> --query <text> [flags]
   loom comment --pr <number> (--body <text> | --body-file <file>) [flags]
+  loom edit --comment <id> (--body <text> | --body-file <file>) [flags]
+  loom delete --comment <id> [flags]
   loom reply --pr <number> --comment <id> (--body <text> | --body-file <file>)
   loom resolve --thread <node-id>
   loom unresolve --thread <node-id>
@@ -41,6 +43,8 @@ Examples:
   loom comment --pr 24 --path main.go --line 42 --side RIGHT --body "Please rename this."
   loom comment --pr 24 --path README.md --start-line 10 --start-side RIGHT --line 14 --side RIGHT --body "This section needs more detail."
   loom comment --pr 24 --path docs/LLM_GUIDE.md --subject file --body "This file needs an inline usage example."
+  loom edit --repo ryuvel/tacara --comment 2857259586 --body "Updated wording"
+  loom delete --repo ryuvel/tacara --comment 2857259586
   loom reply --pr 24 --comment 2857259586 --body "Addressed in <commit-url>"
   loom resolve --thread PRRT_kwDORR607s5w3N_2
 `
@@ -197,6 +201,20 @@ type reviewCommentResponse struct {
 	SubjectType string `json:"subject_type"`
 }
 
+type commentResponse struct {
+	ID      int64  `json:"id"`
+	HTMLURL string `json:"html_url"`
+}
+
+type restAPIError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *restAPIError) Error() string {
+	return e.Message
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprint(os.Stderr, usage)
@@ -214,6 +232,10 @@ func main() {
 		err = runFind(args)
 	case "comment":
 		err = runComment(args)
+	case "edit":
+		err = runEdit(args)
+	case "delete":
+		err = runDelete(args)
 	case "reply":
 		err = runReply(args)
 	case "resolve":
@@ -374,6 +396,104 @@ func runComment(args []string) error {
 		return err
 	}
 	return postInlineComment(client, owner, repo, pr, req, jsonOut)
+}
+
+func runEdit(args []string) error {
+	fs := flag.NewFlagSet("edit", flag.ContinueOnError)
+	var repoArg string
+	var commentID int64
+	var body string
+	var bodyFile string
+	var commentType string
+	var jsonOut bool
+	fs.StringVar(&repoArg, "repo", "", "owner/name repository")
+	fs.Int64Var(&commentID, "comment", 0, "comment database ID")
+	fs.StringVar(&body, "body", "", "updated comment text")
+	fs.StringVar(&bodyFile, "body-file", "", "read updated comment text from file")
+	fs.StringVar(&commentType, "type", "auto", `comment type: "auto", "review", or "top-level"`)
+	fs.BoolVar(&jsonOut, "json", false, "output JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if commentID <= 0 {
+		return errors.New("--comment is required")
+	}
+	text, err := resolveBodyText(body, bodyFile)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(text) == "" {
+		return errors.New("comment body is empty")
+	}
+
+	owner, repo, err := resolveRepo(repoArg)
+	if err != nil {
+		return err
+	}
+	client, err := api.DefaultRESTClient()
+	if err != nil {
+		return err
+	}
+
+	resolvedType, out, err := editComment(client, owner, repo, commentID, commentType, text)
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(map[string]interface{}{
+			"action":     "edit",
+			"type":       resolvedType,
+			"comment_id": out.ID,
+			"url":        out.HTMLURL,
+		})
+	}
+	fmt.Printf("edited: type=%s comment=%d %s\n", resolvedType, out.ID, out.HTMLURL)
+	return nil
+}
+
+func runDelete(args []string) error {
+	fs := flag.NewFlagSet("delete", flag.ContinueOnError)
+	var repoArg string
+	var commentID int64
+	var commentType string
+	var jsonOut bool
+	fs.StringVar(&repoArg, "repo", "", "owner/name repository")
+	fs.Int64Var(&commentID, "comment", 0, "comment database ID")
+	fs.StringVar(&commentType, "type", "auto", `comment type: "auto", "review", or "top-level"`)
+	fs.BoolVar(&jsonOut, "json", false, "output JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if commentID <= 0 {
+		return errors.New("--comment is required")
+	}
+
+	owner, repo, err := resolveRepo(repoArg)
+	if err != nil {
+		return err
+	}
+	client, err := api.DefaultRESTClient()
+	if err != nil {
+		return err
+	}
+
+	resolvedType, err := deleteComment(client, owner, repo, commentID, commentType)
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(map[string]interface{}{
+			"action":     "delete",
+			"type":       resolvedType,
+			"comment_id": commentID,
+		})
+	}
+	fmt.Printf("deleted: type=%s comment=%d\n", resolvedType, commentID)
+	return nil
 }
 
 func runReply(args []string) error {
@@ -653,6 +773,46 @@ func postInlineComment(client *api.RESTClient, owner, repo string, pr int, req i
 	return nil
 }
 
+func editComment(client *api.RESTClient, owner, repo string, commentID int64, rawType string, text string) (string, commentResponse, error) {
+	commentType, err := normalizeCommentType(rawType)
+	if err != nil {
+		return "", commentResponse{}, err
+	}
+	req := map[string]string{"body": text}
+
+	for _, endpoint := range commentEndpoints(owner, repo, commentID, commentType) {
+		var out commentResponse
+		err := doRESTJSON(client, "PATCH", endpoint.path, req, &out)
+		if err == nil {
+			return endpoint.kind, out, nil
+		}
+		if commentType == "auto" && isNotFoundError(err) {
+			continue
+		}
+		return "", commentResponse{}, err
+	}
+	return "", commentResponse{}, fmt.Errorf("comment %d not found in %s", commentID, owner+"/"+repo)
+}
+
+func deleteComment(client *api.RESTClient, owner, repo string, commentID int64, rawType string) (string, error) {
+	commentType, err := normalizeCommentType(rawType)
+	if err != nil {
+		return "", err
+	}
+
+	for _, endpoint := range commentEndpoints(owner, repo, commentID, commentType) {
+		err := doRESTJSON(client, "DELETE", endpoint.path, nil, nil)
+		if err == nil {
+			return endpoint.kind, nil
+		}
+		if commentType == "auto" && isNotFoundError(err) {
+			continue
+		}
+		return "", err
+	}
+	return "", fmt.Errorf("comment %d not found in %s", commentID, owner+"/"+repo)
+}
+
 func fetchPullHeadSHA(client *api.RESTClient, owner, repo string, pr int) (string, error) {
 	var out pullRequestResponse
 	if err := client.Get(fmt.Sprintf("repos/%s/%s/pulls/%d", owner, repo, pr), &out); err != nil {
@@ -674,6 +834,91 @@ func normalizeDiffSide(raw, flagName string) (string, error) {
 	default:
 		return "", fmt.Errorf("%s must be LEFT or RIGHT", flagName)
 	}
+}
+
+type commentEndpoint struct {
+	kind string
+	path string
+}
+
+func commentEndpoints(owner, repo string, commentID int64, commentType string) []commentEndpoint {
+	review := commentEndpoint{
+		kind: "review",
+		path: fmt.Sprintf("repos/%s/%s/pulls/comments/%d", owner, repo, commentID),
+	}
+	topLevel := commentEndpoint{
+		kind: "top-level",
+		path: fmt.Sprintf("repos/%s/%s/issues/comments/%d", owner, repo, commentID),
+	}
+
+	switch commentType {
+	case "review":
+		return []commentEndpoint{review}
+	case "top-level":
+		return []commentEndpoint{topLevel}
+	default:
+		return []commentEndpoint{review, topLevel}
+	}
+}
+
+func normalizeCommentType(raw string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "auto":
+		return "auto", nil
+	case "review", "inline":
+		return "review", nil
+	case "top-level", "top", "issue", "conversation":
+		return "top-level", nil
+	default:
+		return "", errors.New(`--type must be "auto", "review", or "top-level"`)
+	}
+}
+
+func doRESTJSON(client *api.RESTClient, method, path string, payload interface{}, out interface{}) error {
+	var body io.Reader
+	if payload != nil {
+		bodyBytes, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		body = bytes.NewReader(bodyBytes)
+	}
+
+	resp, err := client.Request(method, path, body)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		message := strings.TrimSpace(string(respBody))
+		if message == "" {
+			message = resp.Status
+		}
+		return &restAPIError{
+			StatusCode: resp.StatusCode,
+			Message:    fmt.Sprintf("GitHub API %s %s failed: HTTP %d: %s", method, path, resp.StatusCode, message),
+		}
+	}
+	if out != nil && len(respBody) > 0 {
+		if err := json.Unmarshal(respBody, out); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func isNotFoundError(err error) bool {
+	var apiErr *restAPIError
+	if errors.As(err, &apiErr) && apiErr.StatusCode == 404 {
+		return true
+	}
+	var ghErr *api.HTTPError
+	return errors.As(err, &ghErr) && ghErr.StatusCode == 404
 }
 
 func resolveRepo(repoArg string) (string, string, error) {
