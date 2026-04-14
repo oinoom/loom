@@ -4,7 +4,7 @@
 
 1. Discover PR review feedback
 2. Filter/sort and prioritize
-3. Post top-level PR comments when needed
+3. Post top-level or inline PR comments when needed
 4. Post replies with resolution notes
 5. Resolve review threads
 6. Re-check for remaining unresolved threads
@@ -16,6 +16,9 @@ Always pass explicit flags and prefer JSON output when available:
 - `loom list --repo <owner/repo> --pr <n> --state unresolved --json`
 - `loom find --repo <owner/repo> --pr <n> --query "<needle>" --json`
 - `loom comment --repo <owner/repo> --pr <n> --body "<text>" --json`
+- `loom comment --repo <owner/repo> --pr <n> --path <file> --line <n> --side RIGHT --body "<text>" --json`
+- `loom comment --repo <owner/repo> --pr <n> --path <file> --start-line <n> --start-side RIGHT --line <n> --side RIGHT --body "<text>" --json`
+- `loom comment --repo <owner/repo> --pr <n> --path <file> --subject file --body "<text>" --json`
 - `loom reply --repo <owner/repo> --pr <n> --comment <id> --body "<text>" --json`
 - `loom resolve --thread <PRRT_...> --json`
 
@@ -31,13 +34,16 @@ loom list --repo ryuvel/tacara --pr 24 --state unresolved --severity critical --
 # 3) Leave a top-level PR note
 loom comment --repo ryuvel/tacara --pr 24 --body "Overall review note" --json
 
-# 4) Reply with a commit URL
+# 4) Leave an inline review comment
+loom comment --repo ryuvel/tacara --pr 24 --path README.md --line 14 --side RIGHT --body "This line needs clarification." --json
+
+# 5) Reply with a commit URL
 loom reply --repo ryuvel/tacara --pr 24 --comment 2857259586 --body "Addressed in https://github.com/owner/repo/commit/<sha>" --json
 
-# 5) Resolve by thread node ID
+# 6) Resolve by thread node ID
 loom resolve --thread PRRT_kwDORR607s5w3N_2 --json
 
-# 6) Verify empty unresolved queue
+# 7) Verify empty unresolved queue
 loom list --repo ryuvel/tacara --pr 24 --state unresolved --json
 ```
 

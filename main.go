@@ -25,7 +25,7 @@ const usage = `loom - sift and action GitHub PR comments quickly
 Usage:
   loom list --pr <number> [flags]
   loom find --pr <number> --query <text> [flags]
-  loom comment --pr <number> (--body <text> | --body-file <file>)
+  loom comment --pr <number> (--body <text> | --body-file <file>) [flags]
   loom reply --pr <number> --comment <id> (--body <text> | --body-file <file>)
   loom resolve --thread <node-id>
   loom unresolve --thread <node-id>
@@ -38,6 +38,9 @@ Examples:
   loom list --pr 24 --state unresolved --severity major --sort created --desc
   loom find --pr 24 --query "stale rows" --path tacara-indexer/src/main.rs
   loom comment --pr 24 --body "Top-level PR note"
+  loom comment --pr 24 --path main.go --line 42 --side RIGHT --body "Please rename this."
+  loom comment --pr 24 --path README.md --start-line 10 --start-side RIGHT --line 14 --side RIGHT --body "This section needs more detail."
+  loom comment --pr 24 --path docs/LLM_GUIDE.md --subject file --body "This file needs an inline usage example."
   loom reply --pr 24 --comment 2857259586 --body "Addressed in <commit-url>"
   loom resolve --thread PRRT_kwDORR607s5w3N_2
 `
@@ -164,6 +167,36 @@ type listOptions struct {
 	Stats    bool
 }
 
+type pullRequestResponse struct {
+	Head struct {
+		SHA string `json:"sha"`
+	} `json:"head"`
+}
+
+type inlineCommentRequest struct {
+	Body        string `json:"body"`
+	CommitID    string `json:"commit_id"`
+	Path        string `json:"path"`
+	SubjectType string `json:"subject_type,omitempty"`
+	Line        int    `json:"line,omitempty"`
+	Side        string `json:"side,omitempty"`
+	StartLine   int    `json:"start_line,omitempty"`
+	StartSide   string `json:"start_side,omitempty"`
+}
+
+type reviewCommentResponse struct {
+	ID          int64  `json:"id"`
+	NodeID      string `json:"node_id"`
+	HTMLURL     string `json:"html_url"`
+	Path        string `json:"path"`
+	Line        *int   `json:"line"`
+	StartLine   *int   `json:"start_line"`
+	Side        string `json:"side"`
+	StartSide   string `json:"start_side"`
+	CommitID    string `json:"commit_id"`
+	SubjectType string `json:"subject_type"`
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprint(os.Stderr, usage)
@@ -286,11 +319,25 @@ func runComment(args []string) error {
 	var pr int
 	var body string
 	var bodyFile string
+	var pathArg string
+	var commitID string
+	var subjectType string
+	var line int
+	var side string
+	var startLine int
+	var startSide string
 	var jsonOut bool
 	fs.StringVar(&repoArg, "repo", "", "owner/name repository")
 	fs.IntVar(&pr, "pr", 0, "pull request number")
 	fs.StringVar(&body, "body", "", "comment text")
 	fs.StringVar(&bodyFile, "body-file", "", "read comment text from file")
+	fs.StringVar(&pathArg, "path", "", "file path for inline review comment")
+	fs.StringVar(&commitID, "commit", "", "pull request head commit SHA (auto-detected if omitted for inline comments)")
+	fs.StringVar(&subjectType, "subject", "", `inline comment subject type (supported: "file")`)
+	fs.IntVar(&line, "line", 0, "line in the pull request diff for inline comments")
+	fs.StringVar(&side, "side", "", "diff side for inline comments: LEFT or RIGHT")
+	fs.IntVar(&startLine, "start-line", 0, "start line for multi-line inline comments")
+	fs.StringVar(&startSide, "start-side", "", "start diff side for multi-line inline comments: LEFT or RIGHT")
 	fs.BoolVar(&jsonOut, "json", false, "output JSON")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -314,31 +361,19 @@ func runComment(args []string) error {
 	if err != nil {
 		return err
 	}
-	path := fmt.Sprintf("repos/%s/%s/issues/%d/comments", owner, repo, pr)
-	req := map[string]string{"body": text}
-	bodyBytes, err := json.Marshal(req)
+
+	if strings.TrimSpace(pathArg) == "" {
+		if commitID != "" || subjectType != "" || line > 0 || side != "" || startLine > 0 || startSide != "" {
+			return errors.New("inline comment flags require --path; for top-level PR comments use only --body/--body-file")
+		}
+		return postTopLevelComment(client, owner, repo, pr, text, jsonOut)
+	}
+
+	req, err := buildInlineCommentRequest(client, owner, repo, pr, text, pathArg, commitID, subjectType, line, side, startLine, startSide)
 	if err != nil {
 		return err
 	}
-	var out struct {
-		ID      int64  `json:"id"`
-		HTMLURL string `json:"html_url"`
-	}
-	if err := client.Post(path, bytes.NewReader(bodyBytes), &out); err != nil {
-		return err
-	}
-	if jsonOut {
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		return enc.Encode(map[string]interface{}{
-			"action":     "comment",
-			"pr":         pr,
-			"comment_id": out.ID,
-			"url":        out.HTMLURL,
-		})
-	}
-	fmt.Printf("commented: pr=%d comment=%d %s\n", pr, out.ID, out.HTMLURL)
-	return nil
+	return postInlineComment(client, owner, repo, pr, req, jsonOut)
 }
 
 func runReply(args []string) error {
@@ -478,6 +513,167 @@ func resolveBodyText(body, bodyFile string) (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+func postTopLevelComment(client *api.RESTClient, owner, repo string, pr int, text string, jsonOut bool) error {
+	path := fmt.Sprintf("repos/%s/%s/issues/%d/comments", owner, repo, pr)
+	req := map[string]string{"body": text}
+	bodyBytes, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
+	var out struct {
+		ID      int64  `json:"id"`
+		HTMLURL string `json:"html_url"`
+	}
+	if err := client.Post(path, bytes.NewReader(bodyBytes), &out); err != nil {
+		return err
+	}
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(map[string]interface{}{
+			"action":     "comment",
+			"type":       "top-level",
+			"pr":         pr,
+			"comment_id": out.ID,
+			"url":        out.HTMLURL,
+		})
+	}
+	fmt.Printf("commented: pr=%d comment=%d %s\n", pr, out.ID, out.HTMLURL)
+	return nil
+}
+
+func buildInlineCommentRequest(
+	client *api.RESTClient,
+	owner, repo string,
+	pr int,
+	text, pathArg, commitID, subjectType string,
+	line int,
+	side string,
+	startLine int,
+	startSide string,
+) (inlineCommentRequest, error) {
+	req := inlineCommentRequest{
+		Body: text,
+		Path: strings.TrimSpace(pathArg),
+	}
+	if req.Path == "" {
+		return inlineCommentRequest{}, errors.New("--path is required for inline review comments")
+	}
+
+	normalizedSubject := strings.ToLower(strings.TrimSpace(subjectType))
+	if normalizedSubject != "" && normalizedSubject != "file" {
+		return inlineCommentRequest{}, errors.New(`--subject must be "file" when provided`)
+	}
+
+	if strings.TrimSpace(commitID) == "" {
+		headSHA, err := fetchPullHeadSHA(client, owner, repo, pr)
+		if err != nil {
+			return inlineCommentRequest{}, err
+		}
+		req.CommitID = headSHA
+	} else {
+		req.CommitID = strings.TrimSpace(commitID)
+	}
+
+	if normalizedSubject == "file" {
+		if line > 0 || side != "" || startLine > 0 || startSide != "" {
+			return inlineCommentRequest{}, errors.New("--subject file cannot be combined with --line, --side, --start-line, or --start-side")
+		}
+		req.SubjectType = "file"
+		return req, nil
+	}
+
+	if line <= 0 {
+		return inlineCommentRequest{}, errors.New("inline review comments require --line unless using --subject file")
+	}
+	normalizedSide, err := normalizeDiffSide(side, "--side")
+	if err != nil {
+		return inlineCommentRequest{}, err
+	}
+	req.Line = line
+	req.Side = normalizedSide
+
+	if startLine > 0 || strings.TrimSpace(startSide) != "" {
+		if startLine <= 0 {
+			return inlineCommentRequest{}, errors.New("--start-line is required when using --start-side")
+		}
+		normalizedStartSide, err := normalizeDiffSide(startSide, "--start-side")
+		if err != nil {
+			return inlineCommentRequest{}, err
+		}
+		req.StartLine = startLine
+		req.StartSide = normalizedStartSide
+	}
+
+	return req, nil
+}
+
+func postInlineComment(client *api.RESTClient, owner, repo string, pr int, req inlineCommentRequest, jsonOut bool) error {
+	path := fmt.Sprintf("repos/%s/%s/pulls/%d/comments", owner, repo, pr)
+	bodyBytes, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
+	var out reviewCommentResponse
+	if err := client.Post(path, bytes.NewReader(bodyBytes), &out); err != nil {
+		return err
+	}
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		payload := map[string]interface{}{
+			"action":     "comment",
+			"type":       "inline",
+			"pr":         pr,
+			"comment_id": out.ID,
+			"url":        out.HTMLURL,
+			"path":       out.Path,
+			"commit_id":  out.CommitID,
+		}
+		if out.Line != nil {
+			payload["line"] = *out.Line
+		}
+		if out.StartLine != nil {
+			payload["start_line"] = *out.StartLine
+		}
+		if out.Side != "" {
+			payload["side"] = out.Side
+		}
+		if out.StartSide != "" {
+			payload["start_side"] = out.StartSide
+		}
+		if out.SubjectType != "" {
+			payload["subject_type"] = out.SubjectType
+		}
+		return enc.Encode(payload)
+	}
+	fmt.Printf("commented-inline: pr=%d comment=%d %s\n", pr, out.ID, out.HTMLURL)
+	return nil
+}
+
+func fetchPullHeadSHA(client *api.RESTClient, owner, repo string, pr int) (string, error) {
+	var out pullRequestResponse
+	if err := client.Get(fmt.Sprintf("repos/%s/%s/pulls/%d", owner, repo, pr), &out); err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(out.Head.SHA) == "" {
+		return "", errors.New("pull request head SHA not found")
+	}
+	return strings.TrimSpace(out.Head.SHA), nil
+}
+
+func normalizeDiffSide(raw, flagName string) (string, error) {
+	side := strings.ToUpper(strings.TrimSpace(raw))
+	switch side {
+	case "LEFT", "RIGHT":
+		return side, nil
+	case "":
+		return "", fmt.Errorf("%s is required", flagName)
+	default:
+		return "", fmt.Errorf("%s must be LEFT or RIGHT", flagName)
+	}
 }
 
 func resolveRepo(repoArg string) (string, string, error) {

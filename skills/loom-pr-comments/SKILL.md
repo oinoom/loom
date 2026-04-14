@@ -25,6 +25,12 @@ Use `loom` to handle GitHub PR comments quickly.
   - `loom list --repo <owner/repo> --pr <number> --stats`
 - Leave a top-level PR comment:
   - `loom comment --repo <owner/repo> --pr <number> --body "<message>"`
+- Leave an inline PR review comment on one line:
+  - `loom comment --repo <owner/repo> --pr <number> --path <file> --line <n> --side RIGHT --body "<message>"`
+- Leave an inline PR review comment on a line range:
+  - `loom comment --repo <owner/repo> --pr <number> --path <file> --start-line <n> --start-side RIGHT --line <n> --side RIGHT --body "<message>"`
+- Leave a file-level PR review comment:
+  - `loom comment --repo <owner/repo> --pr <number> --path <file> --subject file --body "<message>"`
 - Reply to a review comment:
   - `loom reply --repo <owner/repo> --pr <number> --comment <database-comment-id> --body "<message>"`
 - Resolve/unresolve a thread:
@@ -35,7 +41,7 @@ Use `loom` to handle GitHub PR comments quickly.
 
 1. `loom list` unresolved comments.
 2. Group with `--stats`, narrow with `--path`, `--author`, `--severity`.
-3. Leave a top-level PR note with `loom comment` when needed.
+3. Leave a top-level or inline PR note with `loom comment` when needed.
 4. Implement fixes.
 5. Reply with commit links via `loom reply`.
 6. Resolve threads with `loom resolve`.

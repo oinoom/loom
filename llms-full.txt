@@ -6,7 +6,7 @@ Primary use cases:
 
 1. Enumerate unresolved review threads
 2. Filter by path/author/severity/text
-3. Leave top-level PR comments when needed
+3. Leave top-level or inline PR comments when needed
 4. Reply with status/resolution comments
 5. Resolve/unresolve threads
 6. Re-check unresolved count until zero
@@ -43,6 +43,14 @@ Flags:
 
 If `--body` and `--body-file` are omitted, stdin is used.
 
+For inline review comments, add:
+
+- `--path <file>` plus `--line <n> --side LEFT|RIGHT` for single-line comments
+- `--path <file> --start-line <n> --start-side LEFT|RIGHT --line <n> --side LEFT|RIGHT` for range comments
+- `--path <file> --subject file` for file-level comments
+
+If `--commit` is omitted for an inline comment, loom uses the PR head SHA automatically.
+
 ### Reply
 
 `loom reply --pr <number> --comment <database-id> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
@@ -71,4 +79,5 @@ If `--body` and `--body-file` are omitted, stdin is used.
 - Requires authenticated `gh` session.
 - Uses GitHub GraphQL for thread data and resolve mutations.
 - Uses GitHub REST issue comments endpoint for top-level PR comments.
+- Uses GitHub REST pull request review comments endpoint for inline/file/range comments.
 - Uses GitHub REST endpoint for review comment replies.
