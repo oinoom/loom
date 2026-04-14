@@ -10,7 +10,8 @@ Primary use cases:
 4. Edit or delete mistaken comments without dropping to raw API calls
 5. Reply with status/resolution comments
 6. Resolve/unresolve threads
-7. Re-check unresolved count until zero
+7. Merge the PR when review state is clean
+8. Re-check unresolved count until zero
 
 ## Commands
 
@@ -64,6 +65,12 @@ If `--type` is omitted, loom tries review comments first and then top-level PR c
 
 If `--type` is omitted, loom tries review comments first and then top-level PR conversation comments.
 
+### Merge
+
+`loom merge --pr <number> [--repo owner/repo] [--method merge|squash|rebase] [--json]`
+
+If `--method` is omitted, loom uses `squash`.
+
 ### Reply
 
 `loom reply --pr <number> --comment <database-id> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
@@ -86,6 +93,7 @@ If `--body` and `--body-file` are omitted, stdin is used.
   - `comment`: object with action/pr/comment_id/url
   - `edit`: object with action/type/comment_id/url
   - `delete`: object with action/type/comment_id
+  - `merge`: object with action/pr/method/merged/sha/message
   - `reply`: object with action/comment_id/reply_id/url
   - `resolve/unresolve`: object with action/thread_id
 
@@ -96,4 +104,5 @@ If `--body` and `--body-file` are omitted, stdin is used.
 - Uses GitHub REST issue comments endpoint for top-level PR comments.
 - Uses GitHub REST pull request review comments endpoint for inline/file/range comments.
 - Uses GitHub REST issue and review comment endpoints for edit/delete auto-detection.
+- Uses GitHub REST merge endpoint for PR merges.
 - Uses GitHub REST endpoint for review comment replies.

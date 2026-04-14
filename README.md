@@ -12,6 +12,7 @@ It is also designed to be automation/LLM-friendly.
 - Posts top-level PR conversation comments
 - Posts inline PR review comments on files, lines, or line ranges
 - Edits or deletes existing PR comments by comment ID
+- Merges pull requests from the CLI
 - Replies to review comments by DB comment ID
 - Resolves/unresolves review threads by GraphQL thread ID
 
@@ -120,6 +121,12 @@ Delete an existing PR comment:
 loom delete --repo ryuvel/tacara --comment 2857259586
 ```
 
+Merge a PR:
+
+```bash
+loom merge --repo ryuvel/tacara --pr 24 --method squash
+```
+
 Reply to a review comment:
 
 ```bash
@@ -140,6 +147,7 @@ loom comment --repo ryuvel/tacara --pr 24 --body "Top-level PR note" --json
 loom comment --repo ryuvel/tacara --pr 24 --path main.go --line 42 --side RIGHT --body "Please rename this." --json
 loom edit --repo ryuvel/tacara --comment 2857259586 --body "Updated wording" --json
 loom delete --repo ryuvel/tacara --comment 2857259586 --json
+loom merge --repo ryuvel/tacara --pr 24 --method squash --json
 loom reply --repo ryuvel/tacara --pr 24 --comment 2857259586 --body "Addressed in <commit-url>" --json
 loom resolve --thread PRRT_kwDORR607s5w3N_2 --json
 ```

@@ -31,6 +31,7 @@ Usage:
   loom reply --pr <number> --comment <id> (--body <text> | --body-file <file>)
   loom resolve --thread <node-id>
   loom unresolve --thread <node-id>
+  loom merge --pr <number> [flags]
 
 Common flags:
   --repo <owner/name>   Repository (default: current git remote)
@@ -47,6 +48,7 @@ Examples:
   loom delete --repo ryuvel/tacara --comment 2857259586
   loom reply --pr 24 --comment 2857259586 --body "Addressed in <commit-url>"
   loom resolve --thread PRRT_kwDORR607s5w3N_2
+  loom merge --repo ryuvel/tacara --pr 24 --method squash
 `
 
 const listThreadsQuery = `
@@ -206,6 +208,12 @@ type commentResponse struct {
 	HTMLURL string `json:"html_url"`
 }
 
+type mergeResponse struct {
+	SHA     string `json:"sha"`
+	Merged  bool   `json:"merged"`
+	Message string `json:"message"`
+}
+
 type restAPIError struct {
 	StatusCode int
 	Message    string
@@ -242,6 +250,8 @@ func main() {
 		err = runResolve(args, false)
 	case "unresolve":
 		err = runResolve(args, true)
+	case "merge":
+		err = runMerge(args)
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 		return
@@ -493,6 +503,68 @@ func runDelete(args []string) error {
 		})
 	}
 	fmt.Printf("deleted: type=%s comment=%d\n", resolvedType, commentID)
+	return nil
+}
+
+func runMerge(args []string) error {
+	fs := flag.NewFlagSet("merge", flag.ContinueOnError)
+	var repoArg string
+	var pr int
+	var method string
+	var title string
+	var message string
+	var jsonOut bool
+	fs.StringVar(&repoArg, "repo", "", "owner/name repository")
+	fs.IntVar(&pr, "pr", 0, "pull request number")
+	fs.StringVar(&method, "method", "squash", "merge method: merge|squash|rebase")
+	fs.StringVar(&title, "title", "", "optional merge commit title")
+	fs.StringVar(&message, "message", "", "optional merge commit message")
+	fs.BoolVar(&jsonOut, "json", false, "output JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if pr <= 0 {
+		return errors.New("--pr is required")
+	}
+	mergeMethod, err := normalizeMergeMethod(method)
+	if err != nil {
+		return err
+	}
+
+	owner, repo, err := resolveRepo(repoArg)
+	if err != nil {
+		return err
+	}
+	client, err := api.DefaultRESTClient()
+	if err != nil {
+		return err
+	}
+
+	req := map[string]string{"merge_method": mergeMethod}
+	if strings.TrimSpace(title) != "" {
+		req["commit_title"] = strings.TrimSpace(title)
+	}
+	if strings.TrimSpace(message) != "" {
+		req["commit_message"] = strings.TrimSpace(message)
+	}
+
+	var out mergeResponse
+	if err := doRESTJSON(client, "PUT", fmt.Sprintf("repos/%s/%s/pulls/%d/merge", owner, repo, pr), req, &out); err != nil {
+		return err
+	}
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(map[string]interface{}{
+			"action":  "merge",
+			"pr":      pr,
+			"method":  mergeMethod,
+			"merged":  out.Merged,
+			"sha":     out.SHA,
+			"message": out.Message,
+		})
+	}
+	fmt.Printf("merged: pr=%d method=%s sha=%s %s\n", pr, mergeMethod, out.SHA, out.Message)
 	return nil
 }
 
@@ -871,6 +943,18 @@ func normalizeCommentType(raw string) (string, error) {
 		return "top-level", nil
 	default:
 		return "", errors.New(`--type must be "auto", "review", or "top-level"`)
+	}
+}
+
+func normalizeMergeMethod(raw string) (string, error) {
+	method := strings.ToLower(strings.TrimSpace(raw))
+	switch method {
+	case "", "squash":
+		return "squash", nil
+	case "merge", "rebase":
+		return method, nil
+	default:
+		return "", errors.New(`--method must be "merge", "squash", or "rebase"`)
 	}
 }
 

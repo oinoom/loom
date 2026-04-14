@@ -40,6 +40,8 @@ Use `loom` to handle GitHub PR comments quickly.
 - Resolve/unresolve a thread:
   - `loom resolve --thread <PRRT_...>`
   - `loom unresolve --thread <PRRT_...>`
+- Merge a PR after review is complete:
+  - `loom merge --repo <owner/repo> --pr <number> --method squash`
 
 ## Typical Workflow
 
@@ -50,4 +52,5 @@ Use `loom` to handle GitHub PR comments quickly.
 5. Implement fixes.
 6. Reply with commit links via `loom reply`.
 7. Resolve threads with `loom resolve`.
-8. Re-run `loom list --state unresolved` and ensure the table is empty.
+8. If the user asks to merge and the review state is clear, use `loom merge`.
+9. Re-run `loom list --state unresolved` and ensure the table is empty.

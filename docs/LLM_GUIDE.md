@@ -8,7 +8,8 @@
 4. Edit or delete mistaken comments without leaving the PR context
 5. Post replies with resolution notes
 6. Resolve review threads
-7. Re-check for remaining unresolved threads
+7. Merge once the review state is clear
+8. Re-check for remaining unresolved threads
 
 ## Recommended invocation style
 
@@ -24,6 +25,7 @@ Always pass explicit flags and prefer JSON output when available:
 - `loom delete --repo <owner/repo> --comment <id> --json`
 - `loom reply --repo <owner/repo> --pr <n> --comment <id> --body "<text>" --json`
 - `loom resolve --thread <PRRT_...> --json`
+- `loom merge --repo <owner/repo> --pr <n> --method squash --json`
 
 ## Automation-friendly flow
 
@@ -52,7 +54,10 @@ loom resolve --thread PRRT_kwDORR607s5w3N_2 --json
 # 8) Delete a stray top-level or review comment if needed
 loom delete --repo ryuvel/tacara --comment 2857259586 --json
 
-# 9) Verify empty unresolved queue
+# 9) Merge when review state is clean
+loom merge --repo ryuvel/tacara --pr 24 --method squash --json
+
+# 10) Verify empty unresolved queue
 loom list --repo ryuvel/tacara --pr 24 --state unresolved --json
 ```
 
@@ -71,6 +76,8 @@ loom list --repo ryuvel/tacara --pr 24 --state unresolved --json
   - pass `--body`, `--body-file`, or pipe stdin.
 - `comment not found in owner/repo`
   - confirm the comment ID and pass `--type review` or `--type top-level` if auto-detection is ambiguous.
+- `--method must be "merge", "squash", or "rebase"`
+  - pass a supported merge method.
 - auth failures
   - run `gh auth status` and re-authenticate.
 
