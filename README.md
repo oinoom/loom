@@ -1,6 +1,6 @@
 # loom
 
-`loom` is a fast CLI for triaging and actioning GitHub PR comments.
+`loom` is a fast CLI for triaging and actioning GitHub PR comments and lightweight issue/PR workflows.
 It is designed for high-volume review loops across top-level PR comments and review threads, including inline comments on files and diff lines.
 It is also designed to be automation/LLM-friendly.
 
@@ -13,6 +13,10 @@ It is also designed to be automation/LLM-friendly.
 - Posts inline PR review comments on files, lines, or line ranges
 - Offers explicit comment mode aliases for top-level, inline, and file comments
 - Edits or deletes existing PR comments by comment ID
+- Creates GitHub issues
+- Closes GitHub issues
+- Opens pull requests
+- Edits pull request title/body/base
 - Merges pull requests from the CLI
 - Replies to review comments by DB comment ID or comment URL
 - Resolves/unresolves review threads by GraphQL thread ID, or by review comment ID/URL when `--repo` and `--pr` are provided
@@ -124,6 +128,30 @@ Delete an existing PR comment:
 loom delete --repo ryuvel/tacara --comment-id 2857259586
 ```
 
+Create an issue:
+
+```bash
+loom issue --repo ryuvel/tacara --title "Tracking bug" --body "Details"
+```
+
+Close an issue:
+
+```bash
+loom issue-close --repo ryuvel/tacara --issue 101 --reason completed
+```
+
+Open a pull request:
+
+```bash
+loom pr-create --repo ryuvel/tacara --head feat/work --base main --title "Ship it" --body "Summary"
+```
+
+Edit a pull request:
+
+```bash
+loom pr-edit --repo ryuvel/tacara --pr 24 --title "Updated title" --body "Updated summary"
+```
+
 Merge a PR:
 
 ```bash
@@ -157,6 +185,10 @@ loom comment-top --repo ryuvel/tacara --pr 24 --body "Top-level PR note" --json
 loom comment-inline --repo ryuvel/tacara --pr 24 --path main.go --line 42 --side RIGHT --body "Please rename this." --json
 loom edit --repo ryuvel/tacara --comment-id 2857259586 --body "Updated wording" --json
 loom delete --repo ryuvel/tacara --comment-id 2857259586 --json
+loom issue --repo ryuvel/tacara --title "Tracking bug" --body "Details" --json
+loom issue-close --repo ryuvel/tacara --issue 101 --reason completed --json
+loom pr-create --repo ryuvel/tacara --head feat/work --base main --title "Ship it" --body "Summary" --json
+loom pr-edit --repo ryuvel/tacara --pr 24 --title "Updated title" --body "Updated summary" --json
 loom merge --repo ryuvel/tacara --pr 24 --method squash --json
 loom reply --repo ryuvel/tacara --pr 24 --comment-id 2857259586 --body "Addressed in <commit-url>" --json
 loom resolve --thread-id PRRT_kwDORR607s5w3N_2 --json

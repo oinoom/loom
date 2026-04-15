@@ -1,6 +1,6 @@
 # loom
 
-loom is a CLI for triaging and actioning GitHub PR comments.
+loom is a CLI for triaging and actioning GitHub PR comments, issues, and pull request metadata.
 
 ## Docs
 
@@ -18,6 +18,10 @@ loom is a CLI for triaging and actioning GitHub PR comments.
 - `loom comment-file --pr <n> --path <file> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
 - `loom edit --comment-id <id-or-url> (--body <text> | --body-file <path>) [--repo owner/repo] [--type auto|review|top-level] [--json]`
 - `loom delete --comment-id <id-or-url> [--repo owner/repo] [--type auto|review|top-level] [--json]`
+- `loom issue --title <text> (--body <text> | --body-file <path>) [--repo owner/repo] [--labels a,b] [--json]`
+- `loom issue-close --issue <n> [--repo owner/repo] [--reason completed|not_planned] [--json]`
+- `loom pr-create --title <text> (--body <text> | --body-file <path>) [--repo owner/repo] [--head <branch>] [--base <branch>] [--draft] [--json]`
+- `loom pr-edit --pr <n> [--title <text>] [--body <text> | --body-file <path>] [--repo owner/repo] [--base <branch>] [--json]`
 - `loom merge --pr <n> [--repo owner/repo] [--method merge|squash|rebase] [--json]`
 - `loom reply --pr <n> --comment-id <id-or-url> --body <text> [--repo owner/repo] [--json]`
 - `loom resolve --thread-id <PRRT_...> [--json]`

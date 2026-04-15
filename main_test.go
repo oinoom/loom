@@ -149,3 +149,49 @@ func TestSortRecordsStableTieBreakers(t *testing.T) {
 		t.Fatalf("got order %v, want %v", got, want)
 	}
 }
+
+func TestNormalizeIssueCloseReason(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		raw     string
+		want    string
+		wantErr bool
+	}{
+		{name: "empty", raw: "", want: ""},
+		{name: "completed", raw: "completed", want: "completed"},
+		{name: "not planned", raw: "not_planned", want: "not_planned"},
+		{name: "invalid", raw: "done", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := normalizeIssueCloseReason(tt.raw)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSplitCSV(t *testing.T) {
+	t.Parallel()
+
+	got := splitCSV("bug, enhancement , , docs")
+	want := []string{"bug", "enhancement", "docs"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}

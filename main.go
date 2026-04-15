@@ -32,6 +32,10 @@ Usage:
   loom edit --comment-id <id-or-url> (--body <text> | --body-file <file>) [flags]
   loom delete --comment-id <id-or-url> [flags]
   loom reply --pr <number> --comment-id <id-or-url> (--body <text> | --body-file <file>)
+  loom issue --title <text> (--body <text> | --body-file <file>) [flags]
+  loom issue-close --issue <number> [flags]
+  loom pr-create --title <text> (--body <text> | --body-file <file>) [flags]
+  loom pr-edit --pr <number> [flags]
   loom resolve --thread-id <node-id> [--repo <owner/name> --pr <number> --comment <id-or-url>]
   loom unresolve --thread-id <node-id> [--repo <owner/name> --pr <number> --comment <id-or-url>]
   loom merge --pr <number> [flags]
@@ -50,6 +54,10 @@ Examples:
   loom edit --repo ryuvel/tacara --comment-id 2857259586 --body "Updated wording"
   loom delete --repo ryuvel/tacara --comment-id 2857259586
   loom reply --pr 24 --comment-id 2857259586 --body "Addressed in <commit-url>"
+  loom issue --repo ryuvel/tacara --title "Tracking bug" --body "Details"
+  loom issue-close --repo ryuvel/tacara --issue 101 --reason completed
+  loom pr-create --repo ryuvel/tacara --head feat/work --base main --title "Ship it" --body "Summary"
+  loom pr-edit --repo ryuvel/tacara --pr 24 --title "Updated title" --body "Updated summary"
   loom resolve --thread-id PRRT_kwDORR607s5w3N_2
   loom merge --repo ryuvel/tacara --pr 24 --method squash
 `
@@ -212,6 +220,20 @@ type commentResponse struct {
 	HTMLURL string `json:"html_url"`
 }
 
+type issueResponse struct {
+	Number  int    `json:"number"`
+	HTMLURL string `json:"html_url"`
+	State   string `json:"state"`
+	Title   string `json:"title"`
+}
+
+type pullRequestCreateResponse struct {
+	Number  int    `json:"number"`
+	HTMLURL string `json:"html_url"`
+	State   string `json:"state"`
+	Title   string `json:"title"`
+}
+
 type mergeResponse struct {
 	SHA     string `json:"sha"`
 	Merged  bool   `json:"merged"`
@@ -256,6 +278,14 @@ func main() {
 		err = runDelete(args)
 	case "reply":
 		err = runReply(args)
+	case "issue":
+		err = runIssue(args)
+	case "issue-close":
+		err = runIssueClose(args)
+	case "pr-create":
+		err = runPRCreate(args)
+	case "pr-edit":
+		err = runPREdit(args)
 	case "resolve":
 		err = runResolve(args, false)
 	case "unresolve":
@@ -660,6 +690,287 @@ func runReply(args []string) error {
 		})
 	}
 	fmt.Printf("replied: comment=%d reply=%d %s\n", commentID, out.ID, out.HTMLURL)
+	return nil
+}
+
+func runIssue(args []string) error {
+	fs := flag.NewFlagSet("issue", flag.ContinueOnError)
+	var repoArg string
+	var title string
+	var body string
+	var bodyFile string
+	var labelsRaw string
+	var jsonOut bool
+	fs.StringVar(&repoArg, "repo", "", "owner/name repository")
+	fs.StringVar(&title, "title", "", "issue title")
+	fs.StringVar(&body, "body", "", "issue body")
+	fs.StringVar(&bodyFile, "body-file", "", "read issue body from file")
+	fs.StringVar(&labelsRaw, "labels", "", "comma-separated labels")
+	fs.BoolVar(&jsonOut, "json", false, "output JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return errors.New("--title is required")
+	}
+	text, err := resolveBodyText(body, bodyFile)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(text) == "" {
+		return errors.New("issue body is empty; pass --body, --body-file, or pipe stdin")
+	}
+
+	owner, repo, err := resolveRepo(repoArg)
+	if err != nil {
+		return err
+	}
+	client, err := api.DefaultRESTClient()
+	if err != nil {
+		return err
+	}
+
+	req := map[string]interface{}{
+		"title": title,
+		"body":  text,
+	}
+	labels := splitCSV(labelsRaw)
+	if len(labels) > 0 {
+		req["labels"] = labels
+	}
+
+	var out issueResponse
+	if err := doRESTJSON(client, "POST", fmt.Sprintf("repos/%s/%s/issues", owner, repo), req, &out); err != nil {
+		return err
+	}
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(map[string]interface{}{
+			"action": "issue",
+			"issue":  out.Number,
+			"url":    out.HTMLURL,
+			"state":  out.State,
+			"title":  out.Title,
+		})
+	}
+	fmt.Printf("issue-created: issue=%d %s\n", out.Number, out.HTMLURL)
+	return nil
+}
+
+func runIssueClose(args []string) error {
+	fs := flag.NewFlagSet("issue-close", flag.ContinueOnError)
+	var repoArg string
+	var issue int
+	var reason string
+	var jsonOut bool
+	fs.StringVar(&repoArg, "repo", "", "owner/name repository")
+	fs.IntVar(&issue, "issue", 0, "issue number")
+	fs.StringVar(&reason, "reason", "", "optional state reason: completed|not_planned")
+	fs.BoolVar(&jsonOut, "json", false, "output JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if issue <= 0 {
+		return errors.New("--issue is required")
+	}
+
+	owner, repo, err := resolveRepo(repoArg)
+	if err != nil {
+		return err
+	}
+	client, err := api.DefaultRESTClient()
+	if err != nil {
+		return err
+	}
+
+	req := map[string]interface{}{"state": "closed"}
+	normalizedReason, err := normalizeIssueCloseReason(reason)
+	if err != nil {
+		return err
+	}
+	if normalizedReason != "" {
+		req["state_reason"] = normalizedReason
+	}
+
+	var out issueResponse
+	if err := doRESTJSON(client, "PATCH", fmt.Sprintf("repos/%s/%s/issues/%d", owner, repo, issue), req, &out); err != nil {
+		return err
+	}
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		payload := map[string]interface{}{
+			"action": "issue-close",
+			"issue":  out.Number,
+			"url":    out.HTMLURL,
+			"state":  out.State,
+			"title":  out.Title,
+		}
+		if normalizedReason != "" {
+			payload["reason"] = normalizedReason
+		}
+		return enc.Encode(payload)
+	}
+	if normalizedReason != "" {
+		fmt.Printf("issue-closed: issue=%d reason=%s %s\n", out.Number, normalizedReason, out.HTMLURL)
+		return nil
+	}
+	fmt.Printf("issue-closed: issue=%d %s\n", out.Number, out.HTMLURL)
+	return nil
+}
+
+func runPRCreate(args []string) error {
+	fs := flag.NewFlagSet("pr-create", flag.ContinueOnError)
+	var repoArg string
+	var title string
+	var body string
+	var bodyFile string
+	var head string
+	var base string
+	var draft bool
+	var jsonOut bool
+	fs.StringVar(&repoArg, "repo", "", "owner/name repository")
+	fs.StringVar(&title, "title", "", "pull request title")
+	fs.StringVar(&body, "body", "", "pull request body")
+	fs.StringVar(&bodyFile, "body-file", "", "read pull request body from file")
+	fs.StringVar(&head, "head", "", "head branch (default: current branch)")
+	fs.StringVar(&base, "base", "main", "base branch")
+	fs.BoolVar(&draft, "draft", false, "create as draft")
+	fs.BoolVar(&jsonOut, "json", false, "output JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return errors.New("--title is required")
+	}
+	text, err := resolveBodyText(body, bodyFile)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(text) == "" {
+		return errors.New("pull request body is empty; pass --body, --body-file, or pipe stdin")
+	}
+	head = strings.TrimSpace(head)
+	if head == "" {
+		head, err = currentGitBranch()
+		if err != nil {
+			return err
+		}
+	}
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return errors.New("--base is required")
+	}
+
+	owner, repo, err := resolveRepo(repoArg)
+	if err != nil {
+		return err
+	}
+	client, err := api.DefaultRESTClient()
+	if err != nil {
+		return err
+	}
+
+	req := map[string]interface{}{
+		"title": title,
+		"body":  text,
+		"head":  head,
+		"base":  base,
+		"draft": draft,
+	}
+
+	var out pullRequestCreateResponse
+	if err := doRESTJSON(client, "POST", fmt.Sprintf("repos/%s/%s/pulls", owner, repo), req, &out); err != nil {
+		return err
+	}
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(map[string]interface{}{
+			"action": "pr-create",
+			"pr":     out.Number,
+			"url":    out.HTMLURL,
+			"state":  out.State,
+			"title":  out.Title,
+			"draft":  draft,
+		})
+	}
+	fmt.Printf("pr-created: pr=%d %s\n", out.Number, out.HTMLURL)
+	return nil
+}
+
+func runPREdit(args []string) error {
+	fs := flag.NewFlagSet("pr-edit", flag.ContinueOnError)
+	var repoArg string
+	var pr int
+	var title string
+	var body string
+	var bodyFile string
+	var base string
+	var jsonOut bool
+	fs.StringVar(&repoArg, "repo", "", "owner/name repository")
+	fs.IntVar(&pr, "pr", 0, "pull request number")
+	fs.StringVar(&title, "title", "", "updated pull request title")
+	fs.StringVar(&body, "body", "", "updated pull request body")
+	fs.StringVar(&bodyFile, "body-file", "", "read updated pull request body from file")
+	fs.StringVar(&base, "base", "", "updated base branch")
+	fs.BoolVar(&jsonOut, "json", false, "output JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if pr <= 0 {
+		return errors.New("--pr is required")
+	}
+
+	req := map[string]interface{}{}
+	if strings.TrimSpace(title) != "" {
+		req["title"] = strings.TrimSpace(title)
+	}
+	if body != "" || bodyFile != "" {
+		text, err := resolveBodyText(body, bodyFile)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(text) == "" {
+			return errors.New("pull request body is empty; pass --body, --body-file, or pipe stdin")
+		}
+		req["body"] = text
+	}
+	if strings.TrimSpace(base) != "" {
+		req["base"] = strings.TrimSpace(base)
+	}
+	if len(req) == 0 {
+		return errors.New("provide at least one of --title, --body/--body-file, or --base")
+	}
+
+	owner, repo, err := resolveRepo(repoArg)
+	if err != nil {
+		return err
+	}
+	client, err := api.DefaultRESTClient()
+	if err != nil {
+		return err
+	}
+
+	var out pullRequestCreateResponse
+	if err := doRESTJSON(client, "PATCH", fmt.Sprintf("repos/%s/%s/pulls/%d", owner, repo, pr), req, &out); err != nil {
+		return err
+	}
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(map[string]interface{}{
+			"action": "pr-edit",
+			"pr":     out.Number,
+			"url":    out.HTMLURL,
+			"state":  out.State,
+			"title":  out.Title,
+		})
+	}
+	fmt.Printf("pr-edited: pr=%d %s\n", pr, out.HTMLURL)
 	return nil
 }
 
@@ -1084,6 +1395,18 @@ func normalizeCommentType(raw string) (string, error) {
 	}
 }
 
+func normalizeIssueCloseReason(raw string) (string, error) {
+	reason := strings.TrimSpace(raw)
+	switch reason {
+	case "":
+		return "", nil
+	case "completed", "not_planned":
+		return reason, nil
+	default:
+		return "", errors.New(`--reason must be "completed" or "not_planned"`)
+	}
+}
+
 func normalizeMergeMethod(raw string) (string, error) {
 	method := strings.ToLower(strings.TrimSpace(raw))
 	switch method {
@@ -1216,6 +1539,31 @@ func parseGitHubRepo(raw string) (string, string, bool) {
 		return "", "", false
 	}
 	return p[len(p)-2], p[len(p)-1], true
+}
+
+func currentGitBranch() (string, error) {
+	branch, err := runGit("branch", "--show-current")
+	if err != nil {
+		return "", err
+	}
+	branch = strings.TrimSpace(branch)
+	if branch == "" {
+		return "", errors.New("could not determine current git branch; pass --head explicitly")
+	}
+	return branch, nil
+}
+
+func splitCSV(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		out = append(out, part)
+	}
+	return out
 }
 
 func fetchReviewThreads(owner, repo string, pr int) ([]threadRecord, error) {
