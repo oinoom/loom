@@ -1,0 +1,150 @@
+# loom (full context)
+
+loom is built for PR comment workflows in GitHub pull requests and for lightweight issue and pull request tracking.
+
+Primary use cases:
+
+1. Enumerate unresolved review threads
+2. Filter by path/author/severity/text
+3. Leave top-level or inline PR comments when needed
+4. Edit or delete mistaken comments without dropping to raw API calls
+5. Reply with status/resolution comments
+6. Resolve/unresolve threads
+7. Open tracking issues when needed
+8. Close issues once the work is done
+9. Open pull requests
+10. Edit pull requests
+11. Merge the PR when review state is clean
+12. Re-check unresolved count until zero
+
+## Commands
+
+### List threads
+
+`loom list --pr <number> [flags]`
+
+Flags:
+
+- `--repo owner/repo` (optional, inferred from upstream git remote)
+- `--state unresolved|resolved|all` (default: unresolved)
+- `--path <substring>`
+- `--author <login>`
+- `--query <text>` (preferred)
+- `--contains <text>` (deprecated alias)
+- `--severity critical|major|minor`
+- `--sort updated|created|path|line|author|severity` (default: updated)
+- `--desc` (default: true)
+- `--limit <n>`
+- `--format auto|table|json|jsonl` (preferred)
+- `--json` (deprecated alias for `--format json`)
+- `--stats`
+
+### Find comments by query
+
+`loom find --pr <number> --query <text> [flags]`
+
+`find` accepts all main filter/sort/output flags from `list`.
+
+### Comment
+
+Preferred explicit modes:
+
+- `loom comment-top --pr <number> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+- `loom comment-inline --pr <number> --path <file> --line <n> --side LEFT|RIGHT (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+- `loom comment-file --pr <number> --path <file> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+
+`loom comment --pr <number> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+
+If `--body` and `--body-file` are omitted, stdin is used.
+
+For inline review comments, add:
+
+- `--path <file>` plus `--line <n> --side LEFT|RIGHT` for single-line comments
+- `--path <file> --start-line <n> --start-side LEFT|RIGHT --line <n> --side LEFT|RIGHT` for range comments
+- `--path <file> --subject file` for file-level comments
+
+If `--commit` is omitted for an inline comment, loom uses the PR head SHA automatically.
+
+### Edit
+
+`loom edit --comment-id <database-id-or-url> (--body <text> | --body-file <path>) [--repo owner/repo] [--type auto|review|top-level] [--json]`
+
+If `--type` is omitted, loom tries review comments first and then top-level PR conversation comments.
+
+### Delete
+
+`loom delete --comment-id <database-id-or-url> [--repo owner/repo] [--type auto|review|top-level] [--json]`
+
+If `--type` is omitted, loom tries review comments first and then top-level PR conversation comments.
+
+### Issue create
+
+`loom issue --title <text> (--body <text> | --body-file <path>) [--repo owner/repo] [--labels a,b] [--json]`
+
+If `--body` and `--body-file` are omitted, stdin is used.
+
+### Issue close
+
+`loom issue-close --issue <number> [--repo owner/repo] [--reason completed|not_planned] [--json]`
+
+### Pull request create
+
+`loom pr-create --title <text> (--body <text> | --body-file <path>) [--repo owner/repo] [--head <branch>] [--base <branch>] [--draft] [--json]`
+
+### Pull request edit
+
+`loom pr-edit --pr <number> [--title <text>] [--body <text> | --body-file <path>] [--repo owner/repo] [--base <branch>] [--json]`
+
+### Merge
+
+`loom merge --pr <number> [--repo owner/repo] [--method merge|squash|rebase] [--json]`
+
+If `--method` is omitted, loom uses `squash`.
+
+### Reply
+
+`loom reply --pr <number> --comment-id <database-id-or-url> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+
+If `--body` and `--body-file` are omitted, stdin is used.
+
+### Resolve
+
+`loom resolve --thread-id <PRRT_...> [--json]`
+
+Or resolve by review comment:
+
+`loom resolve --repo owner/repo --pr <number> --comment-id <database-id-or-url> [--json]`
+
+### Unresolve
+
+`loom unresolve --thread-id <PRRT_...> [--json]`
+
+## Output conventions
+
+- Human mode: tabular output for `list/find`; short status lines for action commands.
+- JSON mode:
+  - `list/find`: array of thread records
+  - `comment`: object with action/pr/comment_id/url
+  - `edit`: object with action/type/comment_id/url
+  - `delete`: object with action/type/comment_id
+  - `issue`: object with action/issue/url/state/title
+  - `issue-close`: object with action/issue/url/state/title/reason?
+  - `pr-create`: object with action/pr/url/state/title/draft
+  - `pr-edit`: object with action/pr/url/state/title
+  - `merge`: object with action/pr/method/merged/sha/message
+  - `reply`: object with action/comment_id/reply_id/url
+  - `resolve/unresolve`: object with action/thread_id
+
+## Operational notes
+
+- Requires authenticated `gh` session.
+- Uses GitHub GraphQL for thread data and resolve mutations.
+- Uses GitHub REST issue comments endpoint for top-level PR comments.
+- Uses GitHub REST issues endpoint for issue create/close.
+- Uses GitHub REST pulls endpoint for PR creation and merge.
+- Uses GitHub REST pulls endpoint for PR edit as well.
+- Uses GitHub REST pull request review comments endpoint for inline/file/range comments.
+- Uses GitHub REST issue and review comment endpoints for edit/delete auto-detection.
+- Uses GitHub REST merge endpoint for PR merges.
+- Uses GitHub REST endpoint for review comment replies.
+- `--stats` writes to stderr so stdout stays machine-readable with `--format json` or `--format jsonl`.
