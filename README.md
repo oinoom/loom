@@ -11,10 +11,11 @@ It is also designed to be automation/LLM-friendly.
 - Sorts by updated/created/path/line/author/severity
 - Posts top-level PR conversation comments
 - Posts inline PR review comments on files, lines, or line ranges
+- Offers explicit comment mode aliases for top-level, inline, and file comments
 - Edits or deletes existing PR comments by comment ID
 - Merges pull requests from the CLI
-- Replies to review comments by DB comment ID
-- Resolves/unresolves review threads by GraphQL thread ID
+- Replies to review comments by DB comment ID or comment URL
+- Resolves/unresolves review threads by GraphQL thread ID, or by review comment ID/URL when `--repo` and `--pr` are provided
 
 ## LLM-first docs
 
@@ -30,7 +31,7 @@ It is also designed to be automation/LLM-friendly.
 ## Build
 
 ```bash
-cd tools/loom
+cd /path/to/loom
 go mod tidy
 go build -o loom
 ```
@@ -40,7 +41,7 @@ go build -o loom
 This installs to `~/.local/bin` (already in PATH on this machine):
 
 ```bash
-cd tools/loom
+cd /path/to/loom
 ./install.sh
 ```
 
@@ -50,75 +51,77 @@ Then verify:
 loom help
 ```
 
-## Install Codex/Claude Skill
+## Install Agent Skill
 
-The repository ships a reusable skill at `.claude/skills/loom-pr-comments`.
-Install it into both global skill locations:
+The repository ships a reusable Loom skill at `skills/loom`.
+Tell your agent to install this skill.
+
+If you want to install it locally into common skill directories, run:
 
 ```bash
-cd tools/loom
+cd /path/to/loom
 ./install-skill.sh
 ```
 
 This installs:
 
-- `~/.codex/skills/loom-pr-comments/SKILL.md`
-- `~/.claude/skills/loom-pr-comments/SKILL.md`
+- `~/.codex/skills/loom/SKILL.md`
+- `~/.claude/skills/loom/SKILL.md`
 
 ## Usage
 
-List unresolved threads:
+List unresolved threads in a stable machine-friendly way:
 
 ```bash
-loom list --repo ryuvel/tacara --pr 24
+loom list --repo ryuvel/tacara --pr 24 --format json
 ```
 
 Find by keyword, narrow to one file, sort newest first:
 
 ```bash
-loom find --repo ryuvel/tacara --pr 24 --query "stale rows" --path tacara-indexer/src/main.rs --sort updated --desc
+loom list --repo ryuvel/tacara --pr 24 --query "stale rows" --path tacara-indexer/src/main.rs --sort updated --desc
 ```
 
 Include grouped stats:
 
 ```bash
-loom list --repo ryuvel/tacara --pr 24 --state unresolved --stats
+loom list --repo ryuvel/tacara --pr 24 --state unresolved --stats --format table
 ```
 
 Comment on a PR:
 
 ```bash
-loom comment --repo ryuvel/tacara --pr 24 --body "Top-level PR note"
+loom comment-top --repo ryuvel/tacara --pr 24 --body "Top-level PR note"
 ```
 
 Comment on one diff line:
 
 ```bash
-loom comment --repo ryuvel/tacara --pr 24 --path main.go --line 42 --side RIGHT --body "Please rename this."
+loom comment-inline --repo ryuvel/tacara --pr 24 --path main.go --line 42 --side RIGHT --body "Please rename this."
 ```
 
 Comment on a diff line range:
 
 ```bash
-loom comment --repo ryuvel/tacara --pr 24 --path README.md --start-line 10 --start-side RIGHT --line 14 --side RIGHT --body "This section needs more detail."
+loom comment-inline --repo ryuvel/tacara --pr 24 --path README.md --start-line 10 --start-side RIGHT --line 14 --side RIGHT --body "This section needs more detail."
 ```
 
 Comment on a whole file in the PR:
 
 ```bash
-loom comment --repo ryuvel/tacara --pr 24 --path docs/LLM_GUIDE.md --subject file --body "This file needs an inline usage example."
+loom comment-file --repo ryuvel/tacara --pr 24 --path docs/LLM_GUIDE.md --body "This file needs an inline usage example."
 ```
 
 Edit an existing PR comment:
 
 ```bash
-loom edit --repo ryuvel/tacara --comment 2857259586 --body "Updated wording"
+loom edit --repo ryuvel/tacara --comment-id 2857259586 --body "Updated wording"
 ```
 
 Delete an existing PR comment:
 
 ```bash
-loom delete --repo ryuvel/tacara --comment 2857259586
+loom delete --repo ryuvel/tacara --comment-id 2857259586
 ```
 
 Merge a PR:
@@ -130,30 +133,37 @@ loom merge --repo ryuvel/tacara --pr 24 --method squash
 Reply to a review comment:
 
 ```bash
-loom reply --repo ryuvel/tacara --pr 24 --comment 2857259586 --body "Addressed in <commit-url>"
+loom reply --repo ryuvel/tacara --pr 24 --comment-id 2857259586 --body "Addressed in <commit-url>"
 ```
 
 Resolve / unresolve a thread:
 
 ```bash
-loom resolve --thread PRRT_kwDORR607s5w3N_2
-loom unresolve --thread PRRT_kwDORR607s5w3N_2
+loom resolve --thread-id PRRT_kwDORR607s5w3N_2
+loom unresolve --thread-id PRRT_kwDORR607s5w3N_2
 ```
 
-JSON output for action commands:
+Resolve a thread from a review comment URL:
 
 ```bash
-loom comment --repo ryuvel/tacara --pr 24 --body "Top-level PR note" --json
-loom comment --repo ryuvel/tacara --pr 24 --path main.go --line 42 --side RIGHT --body "Please rename this." --json
-loom edit --repo ryuvel/tacara --comment 2857259586 --body "Updated wording" --json
-loom delete --repo ryuvel/tacara --comment 2857259586 --json
+loom resolve --repo ryuvel/tacara --pr 24 --comment "https://github.com/ryuvel/tacara/pull/24#discussion_r2857259586"
+```
+
+Machine-readable output:
+
+```bash
+loom list --repo ryuvel/tacara --pr 24 --state all --format jsonl
+loom comment-top --repo ryuvel/tacara --pr 24 --body "Top-level PR note" --json
+loom comment-inline --repo ryuvel/tacara --pr 24 --path main.go --line 42 --side RIGHT --body "Please rename this." --json
+loom edit --repo ryuvel/tacara --comment-id 2857259586 --body "Updated wording" --json
+loom delete --repo ryuvel/tacara --comment-id 2857259586 --json
 loom merge --repo ryuvel/tacara --pr 24 --method squash --json
-loom reply --repo ryuvel/tacara --pr 24 --comment 2857259586 --body "Addressed in <commit-url>" --json
-loom resolve --thread PRRT_kwDORR607s5w3N_2 --json
+loom reply --repo ryuvel/tacara --pr 24 --comment-id 2857259586 --body "Addressed in <commit-url>" --json
+loom resolve --thread-id PRRT_kwDORR607s5w3N_2 --json
 ```
 
-JSON output (for scripting):
+Notes:
 
-```bash
-loom list --repo ryuvel/tacara --pr 24 --state all --json
-```
+- `loom find` still works, but `loom list --query ...` is the preferred search form.
+- `--comment-id` and `--thread-id` are the preferred flag names; `--comment` and `--thread` remain supported.
+- `--stats` prints to stderr so it can be used with `--format json` or `--format jsonl` safely.

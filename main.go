@@ -26,28 +26,31 @@ Usage:
   loom list --pr <number> [flags]
   loom find --pr <number> --query <text> [flags]
   loom comment --pr <number> (--body <text> | --body-file <file>) [flags]
-  loom edit --comment <id> (--body <text> | --body-file <file>) [flags]
-  loom delete --comment <id> [flags]
-  loom reply --pr <number> --comment <id> (--body <text> | --body-file <file>)
-  loom resolve --thread <node-id>
-  loom unresolve --thread <node-id>
+  loom comment-top --pr <number> (--body <text> | --body-file <file>) [flags]
+  loom comment-inline --pr <number> --path <file> --line <n> --side <LEFT|RIGHT> (--body <text> | --body-file <file>) [flags]
+  loom comment-file --pr <number> --path <file> (--body <text> | --body-file <file>) [flags]
+  loom edit --comment-id <id-or-url> (--body <text> | --body-file <file>) [flags]
+  loom delete --comment-id <id-or-url> [flags]
+  loom reply --pr <number> --comment-id <id-or-url> (--body <text> | --body-file <file>)
+  loom resolve --thread-id <node-id> [--repo <owner/name> --pr <number> --comment <id-or-url>]
+  loom unresolve --thread-id <node-id> [--repo <owner/name> --pr <number> --comment <id-or-url>]
   loom merge --pr <number> [flags]
 
 Common flags:
   --repo <owner/name>   Repository (default: current git remote)
 
 Examples:
-  loom list --repo ryuvel/tacara --pr 24
+  loom list --repo ryuvel/tacara --pr 24 --format table
   loom list --pr 24 --state unresolved --severity major --sort created --desc
-  loom find --pr 24 --query "stale rows" --path tacara-indexer/src/main.rs
-  loom comment --pr 24 --body "Top-level PR note"
-  loom comment --pr 24 --path main.go --line 42 --side RIGHT --body "Please rename this."
-  loom comment --pr 24 --path README.md --start-line 10 --start-side RIGHT --line 14 --side RIGHT --body "This section needs more detail."
-  loom comment --pr 24 --path docs/LLM_GUIDE.md --subject file --body "This file needs an inline usage example."
-  loom edit --repo ryuvel/tacara --comment 2857259586 --body "Updated wording"
-  loom delete --repo ryuvel/tacara --comment 2857259586
-  loom reply --pr 24 --comment 2857259586 --body "Addressed in <commit-url>"
-  loom resolve --thread PRRT_kwDORR607s5w3N_2
+  loom list --pr 24 --query "stale rows" --path tacara-indexer/src/main.rs
+  loom comment-top --pr 24 --body "Top-level PR note"
+  loom comment-inline --pr 24 --path main.go --line 42 --side RIGHT --body "Please rename this."
+  loom comment-inline --pr 24 --path README.md --start-line 10 --start-side RIGHT --line 14 --side RIGHT --body "This section needs more detail."
+  loom comment-file --pr 24 --path docs/LLM_GUIDE.md --body "This file needs an inline usage example."
+  loom edit --repo ryuvel/tacara --comment-id 2857259586 --body "Updated wording"
+  loom delete --repo ryuvel/tacara --comment-id 2857259586
+  loom reply --pr 24 --comment-id 2857259586 --body "Addressed in <commit-url>"
+  loom resolve --thread-id PRRT_kwDORR607s5w3N_2
   loom merge --repo ryuvel/tacara --pr 24 --method squash
 `
 
@@ -170,6 +173,7 @@ type listOptions struct {
 	Desc     bool
 	Limit    int
 	JSON     bool
+	Format   string
 	Stats    bool
 }
 
@@ -240,6 +244,12 @@ func main() {
 		err = runFind(args)
 	case "comment":
 		err = runComment(args)
+	case "comment-top":
+		err = runComment(args)
+	case "comment-inline":
+		err = runComment(args)
+	case "comment-file":
+		err = runComment(append(args, "--subject", "file"))
 	case "edit":
 		err = runEdit(args)
 	case "delete":
@@ -268,10 +278,10 @@ func main() {
 func runFind(args []string) error {
 	fs := flag.NewFlagSet("find", flag.ContinueOnError)
 	var opts listOptions
-	var query string
 	fs.StringVar(&opts.Repo, "repo", "", "owner/name repository")
 	fs.IntVar(&opts.PR, "pr", 0, "pull request number")
-	fs.StringVar(&query, "query", "", "text to search in review comments")
+	fs.StringVar(&opts.Contains, "query", "", "text to search in review comments")
+	fs.StringVar(&opts.Contains, "contains", "", "deprecated alias for --query")
 	fs.StringVar(&opts.PathLike, "path", "", "filter by file path substring")
 	fs.StringVar(&opts.Author, "author", "", "filter by root comment author")
 	fs.StringVar(&opts.State, "state", "unresolved", "unresolved|resolved|all")
@@ -279,15 +289,15 @@ func runFind(args []string) error {
 	fs.StringVar(&opts.SortBy, "sort", "updated", "updated|created|path|line|author|severity")
 	fs.BoolVar(&opts.Desc, "desc", true, "descending sort")
 	fs.IntVar(&opts.Limit, "limit", 200, "max rows to print")
-	fs.BoolVar(&opts.JSON, "json", false, "output JSON")
+	fs.StringVar(&opts.Format, "format", "auto", "output format: auto|table|json|jsonl")
+	fs.BoolVar(&opts.JSON, "json", false, "deprecated alias for --format json")
 	fs.BoolVar(&opts.Stats, "stats", false, "print grouped summary")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if strings.TrimSpace(query) == "" {
+	if strings.TrimSpace(opts.Contains) == "" {
 		return errors.New("--query is required")
 	}
-	opts.Contains = query
 	return executeList(opts)
 }
 
@@ -299,12 +309,14 @@ func runList(args []string, presetContains string) error {
 	fs.StringVar(&opts.State, "state", "unresolved", "unresolved|resolved|all")
 	fs.StringVar(&opts.PathLike, "path", "", "filter by file path substring")
 	fs.StringVar(&opts.Author, "author", "", "filter by root comment author")
-	fs.StringVar(&opts.Contains, "contains", presetContains, "filter by body substring")
+	fs.StringVar(&opts.Contains, "query", presetContains, "filter by body substring")
+	fs.StringVar(&opts.Contains, "contains", presetContains, "deprecated alias for --query")
 	fs.StringVar(&opts.Severity, "severity", "", "critical|major|minor")
 	fs.StringVar(&opts.SortBy, "sort", "updated", "updated|created|path|line|author|severity")
 	fs.BoolVar(&opts.Desc, "desc", true, "descending sort")
 	fs.IntVar(&opts.Limit, "limit", 200, "max rows to print")
-	fs.BoolVar(&opts.JSON, "json", false, "output JSON")
+	fs.StringVar(&opts.Format, "format", "auto", "output format: auto|table|json|jsonl")
+	fs.BoolVar(&opts.JSON, "json", false, "deprecated alias for --format json")
 	fs.BoolVar(&opts.Stats, "stats", false, "print grouped summary")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -333,16 +345,24 @@ func executeList(opts listOptions) error {
 		records = records[:opts.Limit]
 	}
 
-	if opts.Stats {
-		printStats(records)
+	format, err := resolveListFormat(opts.Format, opts.JSON)
+	if err != nil {
+		return err
 	}
-	if opts.JSON {
+	if opts.Stats {
+		printStats(os.Stderr, records)
+	}
+	switch format {
+	case "json":
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(records)
+	case "jsonl":
+		return printJSONL(records)
+	default:
+		printTable(records)
+		return nil
 	}
-	printTable(records)
-	return nil
 }
 
 func runComment(args []string) error {
@@ -382,7 +402,7 @@ func runComment(args []string) error {
 		return err
 	}
 	if strings.TrimSpace(text) == "" {
-		return errors.New("comment body is empty")
+		return errors.New("comment body is empty; pass --body, --body-file, or pipe stdin")
 	}
 
 	owner, repo, err := resolveRepo(repoArg)
@@ -411,13 +431,15 @@ func runComment(args []string) error {
 func runEdit(args []string) error {
 	fs := flag.NewFlagSet("edit", flag.ContinueOnError)
 	var repoArg string
-	var commentID int64
+	var commentRef string
 	var body string
 	var bodyFile string
 	var commentType string
 	var jsonOut bool
 	fs.StringVar(&repoArg, "repo", "", "owner/name repository")
-	fs.Int64Var(&commentID, "comment", 0, "comment database ID")
+	fs.StringVar(&commentRef, "comment", "", "comment database ID or URL")
+	fs.StringVar(&commentRef, "comment-id", "", "comment database ID or URL")
+	fs.StringVar(&commentRef, "url", "", "comment URL")
 	fs.StringVar(&body, "body", "", "updated comment text")
 	fs.StringVar(&bodyFile, "body-file", "", "read updated comment text from file")
 	fs.StringVar(&commentType, "type", "auto", `comment type: "auto", "review", or "top-level"`)
@@ -425,7 +447,8 @@ func runEdit(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if commentID <= 0 {
+	commentID, err := parseCommentReference(commentRef)
+	if err != nil {
 		return errors.New("--comment is required")
 	}
 	text, err := resolveBodyText(body, bodyFile)
@@ -433,7 +456,7 @@ func runEdit(args []string) error {
 		return err
 	}
 	if strings.TrimSpace(text) == "" {
-		return errors.New("comment body is empty")
+		return errors.New("comment body is empty; pass --body, --body-file, or pipe stdin")
 	}
 
 	owner, repo, err := resolveRepo(repoArg)
@@ -466,17 +489,20 @@ func runEdit(args []string) error {
 func runDelete(args []string) error {
 	fs := flag.NewFlagSet("delete", flag.ContinueOnError)
 	var repoArg string
-	var commentID int64
+	var commentRef string
 	var commentType string
 	var jsonOut bool
 	fs.StringVar(&repoArg, "repo", "", "owner/name repository")
-	fs.Int64Var(&commentID, "comment", 0, "comment database ID")
+	fs.StringVar(&commentRef, "comment", "", "comment database ID or URL")
+	fs.StringVar(&commentRef, "comment-id", "", "comment database ID or URL")
+	fs.StringVar(&commentRef, "url", "", "comment URL")
 	fs.StringVar(&commentType, "type", "auto", `comment type: "auto", "review", or "top-level"`)
 	fs.BoolVar(&jsonOut, "json", false, "output JSON")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if commentID <= 0 {
+	commentID, err := parseCommentReference(commentRef)
+	if err != nil {
 		return errors.New("--comment is required")
 	}
 
@@ -572,13 +598,15 @@ func runReply(args []string) error {
 	fs := flag.NewFlagSet("reply", flag.ContinueOnError)
 	var repoArg string
 	var pr int
-	var commentID int64
+	var commentRef string
 	var body string
 	var bodyFile string
 	var jsonOut bool
 	fs.StringVar(&repoArg, "repo", "", "owner/name repository")
 	fs.IntVar(&pr, "pr", 0, "pull request number")
-	fs.Int64Var(&commentID, "comment", 0, "pull request review comment database ID")
+	fs.StringVar(&commentRef, "comment", "", "pull request review comment database ID or URL")
+	fs.StringVar(&commentRef, "comment-id", "", "pull request review comment database ID or URL")
+	fs.StringVar(&commentRef, "url", "", "comment URL")
 	fs.StringVar(&body, "body", "", "reply text")
 	fs.StringVar(&bodyFile, "body-file", "", "read reply text from file")
 	fs.BoolVar(&jsonOut, "json", false, "output JSON")
@@ -588,7 +616,8 @@ func runReply(args []string) error {
 	if pr <= 0 {
 		return errors.New("--pr is required")
 	}
-	if commentID <= 0 {
+	commentID, err := parseCommentReference(commentRef)
+	if err != nil {
 		return errors.New("--comment is required")
 	}
 	text, err := resolveBodyText(body, bodyFile)
@@ -596,7 +625,7 @@ func runReply(args []string) error {
 		return err
 	}
 	if strings.TrimSpace(text) == "" {
-		return errors.New("reply body is empty")
+		return errors.New("reply body is empty; pass --body, --body-file, or pipe stdin")
 	}
 
 	owner, repo, err := resolveRepo(repoArg)
@@ -637,14 +666,44 @@ func runReply(args []string) error {
 func runResolve(args []string, undo bool) error {
 	fs := flag.NewFlagSet("resolve", flag.ContinueOnError)
 	var threadID string
+	var repoArg string
+	var pr int
+	var commentRef string
 	var jsonOut bool
+	var err error
 	fs.StringVar(&threadID, "thread", "", "review thread node ID (PRRT_...)")
+	fs.StringVar(&threadID, "thread-id", "", "review thread node ID (PRRT_...)")
+	fs.StringVar(&repoArg, "repo", "", "owner/name repository")
+	fs.IntVar(&pr, "pr", 0, "pull request number (required when resolving by comment)")
+	fs.StringVar(&commentRef, "comment", "", "review comment database ID or URL")
+	fs.StringVar(&commentRef, "comment-id", "", "review comment database ID or URL")
+	fs.StringVar(&commentRef, "url", "", "review comment URL")
 	fs.BoolVar(&jsonOut, "json", false, "output JSON")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if threadID == "" {
-		return errors.New("--thread is required")
+
+	var resolvedCommentID int64
+	if strings.TrimSpace(threadID) == "" {
+		if pr <= 0 {
+			return errors.New("--thread-id is required unless --repo, --pr, and --comment are provided")
+		}
+		resolvedCommentID, err = parseCommentReference(commentRef)
+		if err != nil {
+			return errors.New("--thread-id is required unless --repo, --pr, and --comment are provided")
+		}
+		owner, repo, err := resolveRepo(repoArg)
+		if err != nil {
+			return err
+		}
+		records, err := fetchReviewThreads(owner, repo, pr)
+		if err != nil {
+			return err
+		}
+		threadID, err = findThreadIDByComment(records, resolvedCommentID)
+		if err != nil {
+			return err
+		}
 	}
 	gql, err := api.DefaultGraphQLClient()
 	if err != nil {
@@ -667,8 +726,9 @@ func runResolve(args []string, undo bool) error {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(map[string]interface{}{
-			"action":    action,
-			"thread_id": threadID,
+			"action":     action,
+			"thread_id":  threadID,
+			"comment_id": resolvedCommentID,
 		})
 	}
 	if undo {
@@ -705,6 +765,84 @@ func resolveBodyText(body, bodyFile string) (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+func resolveListFormat(raw string, jsonFlag bool) (string, error) {
+	if jsonFlag {
+		return "json", nil
+	}
+	format := strings.ToLower(strings.TrimSpace(raw))
+	if format == "" {
+		format = "auto"
+	}
+	switch format {
+	case "auto":
+		if stdoutIsTTY() {
+			return "table", nil
+		}
+		return "json", nil
+	case "table", "json", "jsonl":
+		return format, nil
+	default:
+		return "", errors.New(`--format must be "auto", "table", "json", or "jsonl"`)
+	}
+}
+
+func stdoutIsTTY() bool {
+	info, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
+}
+
+func parseCommentReference(raw string) (int64, error) {
+	ref := strings.TrimSpace(raw)
+	if ref == "" {
+		return 0, errors.New("comment reference is empty")
+	}
+	if id, err := strconv.ParseInt(ref, 10, 64); err == nil && id > 0 {
+		return id, nil
+	}
+
+	if strings.HasPrefix(ref, "http://") || strings.HasPrefix(ref, "https://") {
+		u, err := url.Parse(ref)
+		if err != nil {
+			return 0, err
+		}
+		if anchor := strings.TrimSpace(u.Fragment); anchor != "" {
+			switch {
+			case strings.HasPrefix(anchor, "discussion_r"):
+				return strconv.ParseInt(strings.TrimPrefix(anchor, "discussion_r"), 10, 64)
+			case strings.HasPrefix(anchor, "issuecomment-"):
+				return strconv.ParseInt(strings.TrimPrefix(anchor, "issuecomment-"), 10, 64)
+			}
+		}
+		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+		if len(parts) >= 4 {
+			last := parts[len(parts)-1]
+			prev := parts[len(parts)-2]
+			if prev == "comments" && (parts[len(parts)-3] == "pulls" || parts[len(parts)-3] == "issues") {
+				return strconv.ParseInt(last, 10, 64)
+			}
+		}
+	}
+
+	return 0, fmt.Errorf("invalid comment reference %q", raw)
+}
+
+func findThreadIDByComment(records []threadRecord, commentID int64) (string, error) {
+	for _, r := range records {
+		if r.CommentID == commentID {
+			return r.ThreadID, nil
+		}
+		for _, c := range r.AllComments {
+			if c.DatabaseID == commentID {
+				return r.ThreadID, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("review thread not found for comment %d", commentID)
 }
 
 func postTopLevelComment(client *api.RESTClient, owner, repo string, pr int, text string, jsonOut bool) error {
@@ -1236,36 +1374,15 @@ func filterRecords(records []threadRecord, opts listOptions) []threadRecord {
 
 func sortRecords(records []threadRecord, sortBy string, desc bool) {
 	key := strings.ToLower(strings.TrimSpace(sortBy))
-	less := func(i, j int) bool {
-		a, b := records[i], records[j]
-		switch key {
-		case "created":
-			return a.CreatedAt.Before(b.CreatedAt)
-		case "path":
-			if a.Path == b.Path {
-				return a.Line < b.Line
+	sort.SliceStable(records, func(i, j int) bool {
+		primaryCmp, tieCmp := compareThreadRecords(records[i], records[j], key)
+		if primaryCmp != 0 {
+			if desc {
+				return primaryCmp > 0
 			}
-			return a.Path < b.Path
-		case "line":
-			if a.Path == b.Path {
-				return a.Line < b.Line
-			}
-			return a.Path < b.Path
-		case "author":
-			return strings.ToLower(a.Author) < strings.ToLower(b.Author)
-		case "severity":
-			return severityRank(a.Severity) < severityRank(b.Severity)
-		case "updated":
-			fallthrough
-		default:
-			return a.UpdatedAt.Before(b.UpdatedAt)
+			return primaryCmp < 0
 		}
-	}
-	sort.Slice(records, func(i, j int) bool {
-		if desc {
-			return !less(i, j)
-		}
-		return less(i, j)
+		return tieCmp < 0
 	})
 }
 
@@ -1282,9 +1399,93 @@ func severityRank(s string) int {
 	}
 }
 
+func compareThreadRecords(a, b threadRecord, key string) (int, int) {
+	var primaryCmp int
+	switch key {
+	case "created":
+		primaryCmp = compareTimes(a.CreatedAt, b.CreatedAt)
+	case "path":
+		primaryCmp = strings.Compare(a.Path, b.Path)
+		if primaryCmp == 0 {
+			primaryCmp = compareInts(a.Line, b.Line)
+		}
+	case "line":
+		primaryCmp = strings.Compare(a.Path, b.Path)
+		if primaryCmp == 0 {
+			primaryCmp = compareInts(a.Line, b.Line)
+		}
+	case "author":
+		primaryCmp = strings.Compare(strings.ToLower(a.Author), strings.ToLower(b.Author))
+	case "severity":
+		primaryCmp = compareInts(severityRank(b.Severity), severityRank(a.Severity))
+	default:
+		primaryCmp = compareTimes(a.UpdatedAt, b.UpdatedAt)
+	}
+	if primaryCmp != 0 {
+		return primaryCmp, compareThreadRecordTieBreakers(a, b)
+	}
+	return 0, compareThreadRecordTieBreakers(a, b)
+}
+
+func compareThreadRecordTieBreakers(a, b threadRecord) int {
+	var cmp int
+	if cmp = compareTimes(a.UpdatedAt, b.UpdatedAt); cmp != 0 {
+		return cmp
+	}
+	if cmp = compareTimes(a.CreatedAt, b.CreatedAt); cmp != 0 {
+		return cmp
+	}
+	if cmp = strings.Compare(a.Path, b.Path); cmp != 0 {
+		return cmp
+	}
+	if cmp = compareInts(a.Line, b.Line); cmp != 0 {
+		return cmp
+	}
+	if cmp = strings.Compare(strings.ToLower(a.Author), strings.ToLower(b.Author)); cmp != 0 {
+		return cmp
+	}
+	if cmp = strings.Compare(a.ThreadID, b.ThreadID); cmp != 0 {
+		return cmp
+	}
+	return compareInts64(a.CommentID, b.CommentID)
+}
+
+func compareTimes(a, b time.Time) int {
+	switch {
+	case a.Before(b):
+		return -1
+	case a.After(b):
+		return 1
+	default:
+		return 0
+	}
+}
+
+func compareInts(a, b int) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func compareInts64(a, b int64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
+}
+
 func printTable(records []threadRecord) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(w, "THREAD\tCOMMENT\tSTATE\tOUTDATED\tFILE\tAUTHOR\tUPDATED\tSEVERITY\tSUMMARY")
+	fmt.Fprintln(w, "THREAD_ID\tCOMMENT_ID\tSTATE\tOUTDATED\tFILE\tAUTHOR\tUPDATED\tSEVERITY\tSUMMARY")
 	for _, r := range records {
 		state := "open"
 		if r.Resolved {
@@ -1307,7 +1508,17 @@ func printTable(records []threadRecord) {
 	_ = w.Flush()
 }
 
-func printStats(records []threadRecord) {
+func printJSONL(records []threadRecord) error {
+	enc := json.NewEncoder(os.Stdout)
+	for _, r := range records {
+		if err := enc.Encode(r); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printStats(w io.Writer, records []threadRecord) {
 	bySeverity := map[string]int{}
 	byAuthor := map[string]int{}
 	byPath := map[string]int{}
@@ -1320,10 +1531,10 @@ func printStats(records []threadRecord) {
 		byAuthor[r.Author]++
 		byPath[r.Path]++
 	}
-	fmt.Printf("stats: total=%d\n", len(records))
-	fmt.Printf("  by_severity: %s\n", compactMap(bySeverity))
-	fmt.Printf("  by_author:   %s\n", compactMap(byAuthor))
-	fmt.Printf("  by_path:     %s\n", compactMap(byPath))
+	fmt.Fprintf(w, "stats: total=%d\n", len(records))
+	fmt.Fprintf(w, "  by_severity: %s\n", compactMap(bySeverity))
+	fmt.Fprintf(w, "  by_author:   %s\n", compactMap(byAuthor))
+	fmt.Fprintf(w, "  by_path:     %s\n", compactMap(byPath))
 }
 
 func compactMap(m map[string]int) string {

@@ -1,13 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-LOCAL_SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/skills/loom-pr-comments"
-SRC_SKILL_DIR="${ROOT_DIR}/.claude/skills/loom-pr-comments"
-
-if [[ -f "${LOCAL_SKILL_DIR}/SKILL.md" ]]; then
-  SRC_SKILL_DIR="${LOCAL_SKILL_DIR}"
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SRC_SKILL_DIR="${SCRIPT_DIR}/skills/loom"
 
 if [[ ! -f "${SRC_SKILL_DIR}/SKILL.md" ]]; then
   echo "missing source skill: ${SRC_SKILL_DIR}/SKILL.md" >&2
@@ -22,5 +17,5 @@ install_skill() {
   echo "installed skill -> ${target_dir}"
 }
 
-install_skill "${HOME}/.codex/skills/loom-pr-comments"
-install_skill "${HOME}/.claude/skills/loom-pr-comments"
+install_skill "${HOME}/.codex/skills/loom"
+install_skill "${HOME}/.claude/skills/loom"

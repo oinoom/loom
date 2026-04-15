@@ -25,12 +25,14 @@ Flags:
 - `--state unresolved|resolved|all` (default: unresolved)
 - `--path <substring>`
 - `--author <login>`
-- `--contains <text>`
+- `--query <text>` (preferred)
+- `--contains <text>` (deprecated alias)
 - `--severity critical|major|minor`
 - `--sort updated|created|path|line|author|severity` (default: updated)
 - `--desc` (default: true)
 - `--limit <n>`
-- `--json`
+- `--format auto|table|json|jsonl` (preferred)
+- `--json` (deprecated alias for `--format json`)
 - `--stats`
 
 ### Find comments by query
@@ -40,6 +42,12 @@ Flags:
 `find` accepts all main filter/sort/output flags from `list`.
 
 ### Comment
+
+Preferred explicit modes:
+
+- `loom comment-top --pr <number> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+- `loom comment-inline --pr <number> --path <file> --line <n> --side LEFT|RIGHT (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+- `loom comment-file --pr <number> --path <file> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
 
 `loom comment --pr <number> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
 
@@ -55,13 +63,13 @@ If `--commit` is omitted for an inline comment, loom uses the PR head SHA automa
 
 ### Edit
 
-`loom edit --comment <database-id> (--body <text> | --body-file <path>) [--repo owner/repo] [--type auto|review|top-level] [--json]`
+`loom edit --comment-id <database-id-or-url> (--body <text> | --body-file <path>) [--repo owner/repo] [--type auto|review|top-level] [--json]`
 
 If `--type` is omitted, loom tries review comments first and then top-level PR conversation comments.
 
 ### Delete
 
-`loom delete --comment <database-id> [--repo owner/repo] [--type auto|review|top-level] [--json]`
+`loom delete --comment-id <database-id-or-url> [--repo owner/repo] [--type auto|review|top-level] [--json]`
 
 If `--type` is omitted, loom tries review comments first and then top-level PR conversation comments.
 
@@ -73,17 +81,21 @@ If `--method` is omitted, loom uses `squash`.
 
 ### Reply
 
-`loom reply --pr <number> --comment <database-id> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+`loom reply --pr <number> --comment-id <database-id-or-url> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
 
 If `--body` and `--body-file` are omitted, stdin is used.
 
 ### Resolve
 
-`loom resolve --thread <PRRT_...> [--json]`
+`loom resolve --thread-id <PRRT_...> [--json]`
+
+Or resolve by review comment:
+
+`loom resolve --repo owner/repo --pr <number> --comment-id <database-id-or-url> [--json]`
 
 ### Unresolve
 
-`loom unresolve --thread <PRRT_...> [--json]`
+`loom unresolve --thread-id <PRRT_...> [--json]`
 
 ## Output conventions
 
@@ -106,3 +118,4 @@ If `--body` and `--body-file` are omitted, stdin is used.
 - Uses GitHub REST issue and review comment endpoints for edit/delete auto-detection.
 - Uses GitHub REST merge endpoint for PR merges.
 - Uses GitHub REST endpoint for review comment replies.
+- `--stats` writes to stderr so stdout stays machine-readable with `--format json` or `--format jsonl`.

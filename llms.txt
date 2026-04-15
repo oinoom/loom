@@ -6,19 +6,20 @@ loom is a CLI for triaging and actioning GitHub PR comments.
 
 - README: ./README.md
 - LLM Integration Guide: ./docs/LLM_GUIDE.md
-- Skill: ./skills/loom-pr-comments/SKILL.md
+- Skill: ./skills/loom/SKILL.md
 
 ## Key commands
 
-- `loom list --pr <n> [--repo owner/repo] [--json]`
-- `loom find --pr <n> --query <text> [--repo owner/repo] [--json]`
-- `loom comment --pr <n> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
-- `loom comment --pr <n> --path <file> --line <n> --side RIGHT (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
-- `loom comment --pr <n> --path <file> --start-line <n> --start-side RIGHT --line <n> --side RIGHT (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
-- `loom comment --pr <n> --path <file> --subject file (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
-- `loom edit --comment <id> (--body <text> | --body-file <path>) [--repo owner/repo] [--type auto|review|top-level] [--json]`
-- `loom delete --comment <id> [--repo owner/repo] [--type auto|review|top-level] [--json]`
+- `loom list --pr <n> [--repo owner/repo] [--format auto|table|json|jsonl]`
+- `loom find --pr <n> --query <text> [--repo owner/repo] [--format auto|table|json|jsonl]`
+- `loom comment-top --pr <n> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+- `loom comment-inline --pr <n> --path <file> --line <n> --side RIGHT (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+- `loom comment-inline --pr <n> --path <file> --start-line <n> --start-side RIGHT --line <n> --side RIGHT (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+- `loom comment-file --pr <n> --path <file> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+- `loom edit --comment-id <id-or-url> (--body <text> | --body-file <path>) [--repo owner/repo] [--type auto|review|top-level] [--json]`
+- `loom delete --comment-id <id-or-url> [--repo owner/repo] [--type auto|review|top-level] [--json]`
 - `loom merge --pr <n> [--repo owner/repo] [--method merge|squash|rebase] [--json]`
-- `loom reply --pr <n> --comment <id> --body <text> [--repo owner/repo] [--json]`
-- `loom resolve --thread <PRRT_...> [--json]`
-- `loom unresolve --thread <PRRT_...> [--json]`
+- `loom reply --pr <n> --comment-id <id-or-url> --body <text> [--repo owner/repo] [--json]`
+- `loom resolve --thread-id <PRRT_...> [--json]`
+- `loom resolve --repo owner/repo --pr <n> --comment-id <id-or-url> [--json]`
+- `loom unresolve --thread-id <PRRT_...> [--json]`
