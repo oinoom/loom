@@ -24,33 +24,33 @@ Use `loom` to handle GitHub PR comments quickly.
 - Include triage stats:
   - `loom list --repo <owner/repo> --pr <number> --stats`
 - Leave a top-level PR comment:
-  - `loom comment-top --repo <owner/repo> --pr <number> --body "<message>"`
+  - `loom comment top --repo <owner/repo> --pr <number> --body "<message>"`
 - Leave an inline PR review comment on one line:
-  - `loom comment-inline --repo <owner/repo> --pr <number> --path <file> --line <n> --side RIGHT --body "<message>"`
+  - `loom comment inline --repo <owner/repo> --pr <number> --path <file> --line <n> --side RIGHT --body "<message>"`
 - Leave an inline PR review comment on a line range:
-  - `loom comment-inline --repo <owner/repo> --pr <number> --path <file> --start-line <n> --start-side RIGHT --line <n> --side RIGHT --body "<message>"`
+  - `loom comment inline --repo <owner/repo> --pr <number> --path <file> --start-line <n> --start-side RIGHT --line <n> --side RIGHT --body "<message>"`
 - Leave a file-level PR review comment:
-  - `loom comment-file --repo <owner/repo> --pr <number> --path <file> --body "<message>"`
+  - `loom comment file --repo <owner/repo> --pr <number> --path <file> --body "<message>"`
 - Edit an existing PR comment by database ID:
-  - `loom edit --repo <owner/repo> --comment-id <database-comment-id-or-url> --body "<message>"`
+  - `loom comment edit --repo <owner/repo> --comment-id <database-comment-id-or-url> --body "<message>"`
 - Delete an existing PR comment by database ID:
-  - `loom delete --repo <owner/repo> --comment-id <database-comment-id-or-url>`
+  - `loom comment delete --repo <owner/repo> --comment-id <database-comment-id-or-url>`
 - Reply to a review comment:
-  - `loom reply --repo <owner/repo> --pr <number> --comment-id <database-comment-id-or-url> --body "<message>"`
+  - `loom comment reply --repo <owner/repo> --pr <number> --comment-id <database-comment-id-or-url> --body "<message>"`
 - Resolve/unresolve a thread:
-  - `loom resolve --thread-id <PRRT_...>`
-  - `loom unresolve --thread-id <PRRT_...>`
+  - `loom thread resolve --thread-id <PRRT_...>`
+  - `loom thread unresolve --thread-id <PRRT_...>`
 - Merge a PR after review is complete:
-  - `loom merge --repo <owner/repo> --pr <number> --method squash`
+  - `loom pr merge --repo <owner/repo> --pr <number> --method squash`
 
 ## Typical Workflow
 
 1. `loom list` unresolved comments.
 2. Group with `--stats`, narrow with `--path`, `--author`, `--severity`.
-3. Leave a top-level or inline PR note with `loom comment-top`, `loom comment-inline`, or `loom comment-file` when needed.
-4. If you need to correct or remove your own comment, use `loom edit` or `loom delete`.
+3. Leave a top-level or inline PR note with `loom comment top`, `loom comment inline`, or `loom comment file` when needed.
+4. If you need to correct or remove your own comment, use `loom comment edit` or `loom comment delete`.
 5. Implement fixes.
-6. Reply with commit links via `loom reply`.
-7. Resolve threads with `loom resolve`.
-8. If the user asks to merge and the review state is clear, use `loom merge`.
+6. Reply with commit links via `loom comment reply`.
+7. Resolve threads with `loom thread resolve`.
+8. If the user asks to merge and the review state is clear, use `loom pr merge`.
 9. Re-run `loom list --state unresolved` and ensure the table is empty.

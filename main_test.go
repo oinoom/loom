@@ -242,6 +242,70 @@ func TestCommandHelpText(t *testing.T) {
 		t.Fatal("expected list and ls help text to match")
 	}
 
+	commentParentText, ok := commandHelpText("comment")
+	if !ok {
+		t.Fatal("expected comment help")
+	}
+	if !strings.Contains(commentParentText, "SUBCOMMANDS") || !strings.Contains(commentParentText, "comment top") {
+		t.Fatalf("comment help is missing expected sections:\n%s", commentParentText)
+	}
+
+	commentTopText, ok := commandHelpText("comment top")
+	if !ok {
+		t.Fatal("expected comment top help")
+	}
+	commentTopAliasText, ok := commandHelpText("comment-top")
+	if !ok {
+		t.Fatal("expected comment-top help alias")
+	}
+	if commentTopAliasText != commentTopText {
+		t.Fatal("expected comment top and comment-top help text to match")
+	}
+
+	editText, ok := commandHelpText("comment edit")
+	if !ok {
+		t.Fatal("expected comment edit help")
+	}
+	editAliasText, ok := commandHelpText("edit")
+	if !ok {
+		t.Fatal("expected edit help alias")
+	}
+	if editAliasText != editText {
+		t.Fatal("expected comment edit and edit help text to match")
+	}
+
+	issueText, ok := commandHelpText("issue")
+	if !ok {
+		t.Fatal("expected issue help")
+	}
+	if !strings.Contains(issueText, "SUBCOMMANDS") || !strings.Contains(issueText, "issue create") {
+		t.Fatalf("issue help is missing expected sections:\n%s", issueText)
+	}
+
+	issueCreateText, ok := commandHelpText("issue create")
+	if !ok {
+		t.Fatal("expected issue create help")
+	}
+	if !strings.Contains(issueCreateText, "--title") {
+		t.Fatalf("issue create help is missing expected flags:\n%s", issueCreateText)
+	}
+
+	prText, ok := commandHelpText("pr")
+	if !ok {
+		t.Fatal("expected pr help")
+	}
+	if !strings.Contains(prText, "SUBCOMMANDS") || !strings.Contains(prText, "pr merge") {
+		t.Fatalf("pr help is missing expected sections:\n%s", prText)
+	}
+
+	threadText, ok := commandHelpText("thread")
+	if !ok {
+		t.Fatal("expected thread help")
+	}
+	if !strings.Contains(threadText, "SUBCOMMANDS") || !strings.Contains(threadText, "thread resolve") {
+		t.Fatalf("thread help is missing expected sections:\n%s", threadText)
+	}
+
 	resolveText, ok := commandHelpText("resolve")
 	if !ok {
 		t.Fatal("expected resolve help")

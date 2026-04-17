@@ -47,13 +47,13 @@ Flags:
 
 ### Comment
 
-Preferred explicit modes:
+Preferred nested subcommands:
 
-- `loom comment-top --pr <number> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
-- `loom comment-inline --pr <number> --path <file> --line <n> --side LEFT|RIGHT (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
-- `loom comment-file --pr <number> --path <file> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+- `loom comment top --pr <number> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+- `loom comment inline --pr <number> --path <file> --line <n> --side LEFT|RIGHT (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+- `loom comment file --pr <number> --path <file> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
 
-`loom comment --pr <number> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+Legacy single-token aliases like `comment-top`, `comment-inline`, and `comment-file` remain supported.
 
 If `--body` and `--body-file` are omitted, stdin is used.
 
@@ -67,57 +67,57 @@ If `--commit` is omitted for an inline comment, loom uses the PR head SHA automa
 
 ### Edit
 
-`loom edit --comment-id <database-id-or-url> (--body <text> | --body-file <path>) [--repo owner/repo] [--type auto|review|top-level] [--json]`
+`loom comment edit --comment-id <database-id-or-url> (--body <text> | --body-file <path>) [--repo owner/repo] [--type auto|review|top-level] [--json]`
 
 If `--type` is omitted, loom tries review comments first and then top-level PR conversation comments.
 
 ### Delete
 
-`loom delete --comment-id <database-id-or-url> [--repo owner/repo] [--type auto|review|top-level] [--json]`
+`loom comment delete --comment-id <database-id-or-url> [--repo owner/repo] [--type auto|review|top-level] [--json]`
 
 If `--type` is omitted, loom tries review comments first and then top-level PR conversation comments.
 
 ### Issue create
 
-`loom issue --title <text> (--body <text> | --body-file <path>) [--repo owner/repo] [--labels a,b] [--json]`
+`loom issue create --title <text> (--body <text> | --body-file <path>) [--repo owner/repo] [--labels a,b] [--json]`
 
 If `--body` and `--body-file` are omitted, stdin is used.
 
 ### Issue close
 
-`loom issue-close --issue <number> [--repo owner/repo] [--reason completed|not_planned] [--json]`
+`loom issue close --issue <number> [--repo owner/repo] [--reason completed|not_planned] [--json]`
 
 ### Pull request create
 
-`loom pr-create --title <text> (--body <text> | --body-file <path>) [--repo owner/repo] [--head <branch>] [--base <branch>] [--draft] [--json]`
+`loom pr create --title <text> (--body <text> | --body-file <path>) [--repo owner/repo] [--head <branch>] [--base <branch>] [--draft] [--json]`
 
 ### Pull request edit
 
-`loom pr-edit --pr <number> [--title <text>] [--body <text> | --body-file <path>] [--repo owner/repo] [--base <branch>] [--json]`
+`loom pr edit --pr <number> [--title <text>] [--body <text> | --body-file <path>] [--repo owner/repo] [--base <branch>] [--json]`
 
 ### Merge
 
-`loom merge --pr <number> [--repo owner/repo] [--method merge|squash|rebase] [--json]`
+`loom pr merge --pr <number> [--repo owner/repo] [--method merge|squash|rebase] [--json]`
 
 If `--method` is omitted, loom uses `squash`.
 
 ### Reply
 
-`loom reply --pr <number> --comment-id <database-id-or-url> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
+`loom comment reply --pr <number> --comment-id <database-id-or-url> (--body <text> | --body-file <path>) [--repo owner/repo] [--json]`
 
 If `--body` and `--body-file` are omitted, stdin is used.
 
 ### Resolve
 
-`loom resolve --thread-id <PRRT_...> [--json]`
+`loom thread resolve --thread-id <PRRT_...> [--json]`
 
 Or resolve by review comment:
 
-`loom resolve --repo owner/repo --pr <number> --comment-id <database-id-or-url> [--json]`
+`loom thread resolve --repo owner/repo --pr <number> --comment-id <database-id-or-url> [--json]`
 
 ### Unresolve
 
-`loom unresolve --thread-id <PRRT_...> [--json]`
+`loom thread unresolve --thread-id <PRRT_...> [--json]`
 
 ## Output conventions
 
@@ -128,12 +128,12 @@ Or resolve by review comment:
   - `edit`: object with action/type/comment_id/url
   - `delete`: object with action/type/comment_id
   - `issue`: object with action/issue/url/state/title
-  - `issue-close`: object with action/issue/url/state/title/reason?
-  - `pr-create`: object with action/pr/url/state/title/draft
-  - `pr-edit`: object with action/pr/url/state/title
-  - `merge`: object with action/pr/method/merged/sha/message
-  - `reply`: object with action/comment_id/reply_id/url
-  - `resolve/unresolve`: object with action/thread_id
+  - `issue close`: object with action/issue/url/state/title/reason?
+  - `pr create`: object with action/pr/url/state/title/draft
+  - `pr edit`: object with action/pr/url/state/title
+  - `pr merge`: object with action/pr/method/merged/sha/message
+  - `comment reply`: object with action/comment_id/reply_id/url
+  - `thread resolve/unresolve`: object with action/thread_id
 
 ## Operational notes
 

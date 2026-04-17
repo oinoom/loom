@@ -23,46 +23,57 @@ import (
 const usage = `loom - sift and action GitHub PR comments quickly
 
 Usage:
-  loom help [command]
+  loom help [command...]
   loom list --pr <number> [flags]
   loom find --pr <number> --query <text> [flags]
-  loom comment --pr <number> (--body <text> | --body-file <file>) [flags]
-  loom comment-top --pr <number> (--body <text> | --body-file <file>) [flags]
-  loom comment-inline --pr <number> --path <file> --line <n> --side <LEFT|RIGHT> (--body <text> | --body-file <file>) [flags]
-  loom comment-file --pr <number> --path <file> (--body <text> | --body-file <file>) [flags]
-  loom edit --comment-id <id-or-url> (--body <text> | --body-file <file>) [flags]
-  loom delete --comment-id <id-or-url> [flags]
-  loom reply --pr <number> --comment-id <id-or-url> (--body <text> | --body-file <file>)
-  loom issue --title <text> (--body <text> | --body-file <file>) [flags]
-  loom issue-close --issue <number> [flags]
-  loom pr-create --title <text> (--body <text> | --body-file <file>) [flags]
-  loom pr-edit --pr <number> [flags]
-  loom resolve --thread-id <node-id> [--repo <owner/name> --pr <number> --comment <id-or-url>]
-  loom unresolve --thread-id <node-id> [--repo <owner/name> --pr <number> --comment <id-or-url>]
-  loom merge --pr <number> [flags]
+  loom comment <subcommand> [flags]
+  loom issue <subcommand> [flags]
+  loom pr <subcommand> [flags]
+  loom thread <subcommand> [flags]
+
+Comment subcommands:
+  loom comment top --pr <number> (--body <text> | --body-file <file>) [flags]
+  loom comment inline --pr <number> --path <file> --line <n> --side <LEFT|RIGHT> (--body <text> | --body-file <file>) [flags]
+  loom comment file --pr <number> --path <file> (--body <text> | --body-file <file>) [flags]
+  loom comment edit --comment-id <id-or-url> (--body <text> | --body-file <file>) [flags]
+  loom comment delete --comment-id <id-or-url> [flags]
+  loom comment reply --pr <number> --comment-id <id-or-url> (--body <text> | --body-file <file>) [flags]
+
+Issue subcommands:
+  loom issue create --title <text> (--body <text> | --body-file <file>) [flags]
+  loom issue close --issue <number> [flags]
+
+PR subcommands:
+  loom pr create --title <text> (--body <text> | --body-file <file>) [flags]
+  loom pr edit --pr <number> [flags]
+  loom pr merge --pr <number> [flags]
+
+Thread subcommands:
+  loom thread resolve --thread-id <node-id> [--repo <owner/name> --pr <number> --comment <id-or-url>]
+  loom thread unresolve --thread-id <node-id> [--repo <owner/name> --pr <number> --comment <id-or-url>]
 
 Common flags:
   --repo <owner/name>   Repository (default: current git remote)
 
 Examples:
-  loom list --repo ryuvel/tacara --pr 24 --format table
-  loom list --pr 24 --state unresolved --severity major --sort created --desc
-  loom list --pr 24 --query "stale rows" --path tacara-indexer/src/main.rs
-  loom comment-top --pr 24 --body "Top-level PR note"
-  loom comment-inline --pr 24 --path main.go --line 42 --side RIGHT --body "Please rename this."
-  loom comment-inline --pr 24 --path README.md --start-line 10 --start-side RIGHT --line 14 --side RIGHT --body "This section needs more detail."
-  loom comment-file --pr 24 --path docs/LLM_GUIDE.md --body "This file needs an inline usage example."
-  loom edit --repo ryuvel/tacara --comment-id 2857259586 --body "Updated wording"
-  loom delete --repo ryuvel/tacara --comment-id 2857259586
-  loom reply --pr 24 --comment-id 2857259586 --body "Addressed in <commit-url>"
-  loom issue --repo ryuvel/tacara --title "Tracking bug" --body "Details"
-  loom issue-close --repo ryuvel/tacara --issue 101 --reason completed
-  loom pr-create --repo ryuvel/tacara --head feat/work --base main --title "Ship it" --body "Summary"
-  loom pr-edit --repo ryuvel/tacara --pr 24 --title "Updated title" --body "Updated summary"
-  loom resolve --thread-id PRRT_kwDORR607s5w3N_2
-  loom merge --repo ryuvel/tacara --pr 24 --method squash
+  loom list --repo <owner/repo> --pr <pr-number> --format table
+  loom list --pr <pr-number> --state unresolved --severity major --sort created --desc
+  loom list --pr <pr-number> --query "<text>" --path <path/to/file>
+  loom comment top --pr <pr-number> --body "Top-level PR note"
+  loom comment inline --pr <pr-number> --path <path/to/file> --line <line-number> --side RIGHT --body "Please rename this."
+  loom comment file --pr <pr-number> --path <path/to/file> --body "This file needs an inline usage example."
+  loom comment edit --repo <owner/repo> --comment-id <comment-id> --body "Updated wording"
+  loom comment delete --repo <owner/repo> --comment-id <comment-id>
+  loom comment reply --pr <pr-number> --comment-id <comment-id> --body "Addressed in <commit-url>"
+  loom issue create --repo <owner/repo> --title "Tracking bug" --body "Details"
+  loom issue close --repo <owner/repo> --issue <issue-number> --reason completed
+  loom pr create --repo <owner/repo> --head <head-branch> --base <base-branch> --title "Ship it" --body "Summary"
+  loom pr edit --repo <owner/repo> --pr <pr-number> --title "Updated title" --body "Updated summary"
+  loom thread resolve --thread-id <thread-id>
+  loom pr merge --repo <owner/repo> --pr <pr-number> --method squash
 
-Use "loom help <command>" or "loom <command> --help" for command details.
+Use "loom help <command...>" or "loom <command> ... --help" for command details.
+Legacy single-token aliases such as comment-top and pr-create remain supported.
 `
 
 const listHelp = `List pull request review threads.
@@ -121,59 +132,40 @@ OUTPUT
   Uses the same output formats and JSON fields as "loom list".
 
 EXAMPLES
-  loom find --pr 24 --query "rename this"
-  loom find --repo oinoom/loom --pr 24 --query "stale rows" --path main.go --format json
+  loom find --pr <pr-number> --query "rename this"
+  loom find --repo <owner/repo> --pr <pr-number> --query "stale rows" --path <path/to/file> --format json
 `
 
-const commentHelp = `Add a top-level PR comment or an inline review comment.
+const commentHelp = `Manage pull request comments.
 
 USAGE
-  loom comment --pr <number> (--body <text> | --body-file <file>) [flags]
-  loom comment-top --pr <number> (--body <text> | --body-file <file>) [flags]
-  loom comment-inline --pr <number> --path <file> --line <n> --side <LEFT|RIGHT> (--body <text> | --body-file <file>) [flags]
-  loom comment-file --pr <number> --path <file> (--body <text> | --body-file <file>) [flags]
+  loom comment <subcommand> [flags]
 
-DESCRIPTION
-  "comment" supports three modes:
-  - top-level PR comments
-  - inline single-line or multi-line review comments
-  - file-level review comments
+SUBCOMMANDS
+  top                   Add a top-level PR comment
+  inline                Add an inline review comment
+  file                  Add a file-level review comment
+  edit                  Edit an existing PR comment
+  delete                Delete an existing PR comment
+  reply                 Reply to a review comment
 
-  For clearer automation, prefer the explicit aliases:
-  comment-top, comment-inline, comment-file
-
-FLAGS
-  --repo <owner/name>     Repository (default: current git remote)
-  --pr <number>           Pull request number
-  --body <text>           Comment text
-  --body-file <file>      Read comment text from file
-  --path <file>           File path for inline review comments
-  --commit <sha>          PR head commit SHA (auto-detected if omitted)
-  --subject <type>        Inline comment subject type; supported: file
-  --line <n>              Diff line for inline comments
-  --side <LEFT|RIGHT>     Diff side for inline comments
-  --start-line <n>        Start line for multi-line comments
-  --start-side <side>     Start diff side for multi-line comments
-  --json                  Output JSON
-
-NOTES
-  If --body and --body-file are omitted, loom reads from stdin.
-  Inline comments require --path plus --line/--side unless using file mode.
-
-OUTPUT
-  JSON mode returns action, type, pr, comment_id, url, and inline metadata when present.
+ALIASES
+  Legacy single-token aliases remain supported:
+  comment-top, comment-inline, comment-file, edit, delete, reply
 
 EXAMPLES
-  loom comment --pr 24 --body "Top-level PR note"
-  loom comment-inline --pr 24 --path main.go --line 42 --side RIGHT --body "Please rename this."
-  loom comment-inline --pr 24 --path README.md --start-line 10 --start-side RIGHT --line 14 --side RIGHT --body "Needs more detail."
-  loom comment-file --pr 24 --path docs/LLM_GUIDE.md --body "This file needs an example."
+  loom help comment inline
+  loom comment top --pr <pr-number> --body "Top-level PR note"
+  loom comment inline --pr <pr-number> --path <path/to/file> --line <line-number> --side RIGHT --body "Please rename this."
+  loom comment file --pr <pr-number> --path <path/to/file> --body "This file needs an example."
+  loom comment edit --comment-id <comment-id> --body "Updated wording"
+  loom comment reply --pr <pr-number> --comment-id <comment-id> --body "Addressed in <commit-url>"
 `
 
 const commentTopHelp = `Add a top-level pull request comment.
 
 USAGE
-  loom comment-top --pr <number> (--body <text> | --body-file <file>) [flags]
+  loom comment top --pr <number> (--body <text> | --body-file <file>) [flags]
 
 FLAGS
   --repo <owner/name>     Repository (default: current git remote)
@@ -186,15 +178,15 @@ NOTES
   If --body and --body-file are omitted, loom reads from stdin.
 
 EXAMPLES
-  loom comment-top --pr 24 --body "Overall review note"
-  loom comment-top --repo oinoom/loom --pr 24 --body-file /tmp/comment.txt --json
+  loom comment top --pr <pr-number> --body "Overall review note"
+  loom comment top --repo <owner/repo> --pr <pr-number> --body-file /tmp/comment.txt --json
 `
 
 const commentInlineHelp = `Add an inline pull request review comment.
 
 USAGE
-  loom comment-inline --pr <number> --path <file> --line <n> --side <LEFT|RIGHT> (--body <text> | --body-file <file>) [flags]
-  loom comment-inline --pr <number> --path <file> --start-line <n> --start-side <LEFT|RIGHT> --line <n> --side <LEFT|RIGHT> (--body <text> | --body-file <file>) [flags]
+  loom comment inline --pr <number> --path <file> --line <n> --side <LEFT|RIGHT> (--body <text> | --body-file <file>) [flags]
+  loom comment inline --pr <number> --path <file> --start-line <n> --start-side <LEFT|RIGHT> --line <n> --side <LEFT|RIGHT> (--body <text> | --body-file <file>) [flags]
 
 FLAGS
   --repo <owner/name>     Repository (default: current git remote)
@@ -211,17 +203,17 @@ FLAGS
 
 NOTES
   If --body and --body-file are omitted, loom reads from stdin.
-  Use comment-file for whole-file review comments.
+  Use "loom comment file" for whole-file review comments.
 
 EXAMPLES
-  loom comment-inline --pr 24 --path main.go --line 42 --side RIGHT --body "Please rename this."
-  loom comment-inline --pr 24 --path README.md --start-line 10 --start-side RIGHT --line 14 --side RIGHT --body "Needs more detail."
+  loom comment inline --pr <pr-number> --path <path/to/file> --line <line-number> --side RIGHT --body "Please rename this."
+  loom comment inline --pr <pr-number> --path <path/to/file> --start-line <start-line> --start-side RIGHT --line <end-line> --side RIGHT --body "Needs more detail."
 `
 
 const commentFileHelp = `Add a file-level pull request review comment.
 
 USAGE
-  loom comment-file --pr <number> --path <file> (--body <text> | --body-file <file>) [flags]
+  loom comment file --pr <number> --path <file> (--body <text> | --body-file <file>) [flags]
 
 FLAGS
   --repo <owner/name>     Repository (default: current git remote)
@@ -233,16 +225,16 @@ FLAGS
   --json                  Output JSON
 
 NOTES
-  comment-file is equivalent to comment with file subject mode.
+  "loom comment file" is equivalent to "loom comment inline --subject file".
 
 EXAMPLES
-  loom comment-file --pr 24 --path docs/LLM_GUIDE.md --body "This file needs an inline usage example."
+  loom comment file --pr <pr-number> --path <path/to/file> --body "This file needs an inline usage example."
 `
 
 const editHelp = `Edit an existing PR comment.
 
 USAGE
-  loom edit --comment-id <id-or-url> (--body <text> | --body-file <file>) [flags]
+  loom comment edit --comment-id <id-or-url> (--body <text> | --body-file <file>) [flags]
 
 FLAGS
   --repo <owner/name>     Repository (default: current git remote)
@@ -258,14 +250,14 @@ NOTES
   If --type is omitted, loom tries review comments first and then top-level PR comments.
 
 EXAMPLES
-  loom edit --repo oinoom/loom --comment-id 2857259586 --body "Updated wording"
-  loom edit --comment-id https://github.com/owner/repo/pull/24#discussion_r2857259586 --body-file /tmp/comment.txt --json
+  loom comment edit --repo <owner/repo> --comment-id <comment-id> --body "Updated wording"
+  loom comment edit --comment-id https://github.com/<owner>/<repo>/pull/<pr-number>#discussion_r<comment-id> --body-file /tmp/comment.txt --json
 `
 
 const deleteHelp = `Delete an existing PR comment.
 
 USAGE
-  loom delete --comment-id <id-or-url> [flags]
+  loom comment delete --comment-id <id-or-url> [flags]
 
 FLAGS
   --repo <owner/name>     Repository (default: current git remote)
@@ -279,14 +271,14 @@ NOTES
   If --type is omitted, loom tries review comments first and then top-level PR comments.
 
 EXAMPLES
-  loom delete --repo oinoom/loom --comment-id 2857259586
-  loom delete --comment-id https://github.com/owner/repo/pull/24#issuecomment-2857259586 --json
+  loom comment delete --repo <owner/repo> --comment-id <comment-id>
+  loom comment delete --comment-id https://github.com/<owner>/<repo>/pull/<pr-number>#issuecomment-<comment-id> --json
 `
 
 const replyHelp = `Reply to a pull request review comment.
 
 USAGE
-  loom reply --pr <number> --comment-id <id-or-url> (--body <text> | --body-file <file>) [flags]
+  loom comment reply --pr <number> --comment-id <id-or-url> (--body <text> | --body-file <file>) [flags]
 
 FLAGS
   --repo <owner/name>     Repository (default: current git remote)
@@ -302,15 +294,15 @@ NOTES
   If --body and --body-file are omitted, loom reads from stdin.
 
 EXAMPLES
-  loom reply --pr 24 --comment-id 2857259586 --body "Addressed in <commit-url>"
-  loom reply --repo oinoom/loom --pr 24 --comment-id https://github.com/owner/repo/pull/24#discussion_r2857259586 --body-file /tmp/reply.txt --json
+  loom comment reply --pr <pr-number> --comment-id <comment-id> --body "Addressed in <commit-url>"
+  loom comment reply --repo <owner/repo> --pr <pr-number> --comment-id https://github.com/<owner>/<repo>/pull/<pr-number>#discussion_r<comment-id> --body-file /tmp/reply.txt --json
 `
 
 const resolveHelp = `Resolve a pull request review thread.
 
 USAGE
-  loom resolve --thread-id <PRRT_...> [flags]
-  loom resolve --repo <owner/name> --pr <number> --comment-id <id-or-url> [flags]
+  loom thread resolve --thread-id <PRRT_...> [flags]
+  loom thread resolve --repo <owner/name> --pr <number> --comment-id <id-or-url> [flags]
 
 FLAGS
   --thread <PRRT_...>     Review thread node ID
@@ -330,31 +322,31 @@ OUTPUT
   JSON mode returns action, thread_id, and comment_id when resolving by comment.
 
 EXAMPLES
-  loom resolve --thread-id PRRT_kwDORR607s5w3N_2
-  loom resolve --repo oinoom/loom --pr 24 --comment-id 2857259586 --json
+  loom thread resolve --thread-id <thread-id>
+  loom thread resolve --repo <owner/repo> --pr <pr-number> --comment-id <comment-id> --json
 `
 
 const unresolveHelp = `Unresolve a pull request review thread.
 
 USAGE
-  loom unresolve --thread-id <PRRT_...> [flags]
-  loom unresolve --repo <owner/name> --pr <number> --comment-id <id-or-url> [flags]
+  loom thread unresolve --thread-id <PRRT_...> [flags]
+  loom thread unresolve --repo <owner/name> --pr <number> --comment-id <id-or-url> [flags]
 
 FLAGS
-  Uses the same flags as "loom resolve".
+  Uses the same flags as "loom thread resolve".
 
 OUTPUT
   JSON mode returns action, thread_id, and comment_id when unresolving by comment.
 
 EXAMPLES
-  loom unresolve --thread-id PRRT_kwDORR607s5w3N_2
-  loom unresolve --repo oinoom/loom --pr 24 --comment-id https://github.com/owner/repo/pull/24#discussion_r2857259586 --json
+  loom thread unresolve --thread-id <thread-id>
+  loom thread unresolve --repo <owner/repo> --pr <pr-number> --comment-id https://github.com/<owner>/<repo>/pull/<pr-number>#discussion_r<comment-id> --json
 `
 
 const mergeHelp = `Merge a pull request.
 
 USAGE
-  loom merge --pr <number> [flags]
+  loom pr merge --pr <number> [flags]
 
 FLAGS
   --repo <owner/name>     Repository (default: current git remote)
@@ -368,14 +360,33 @@ OUTPUT
   JSON mode returns action, pr, method, merged, sha, and message.
 
 EXAMPLES
-  loom merge --pr 24 --method squash
-  loom merge --repo oinoom/loom --pr 24 --method rebase --json
+  loom pr merge --pr <pr-number> --method squash
+  loom pr merge --repo <owner/repo> --pr <pr-number> --method rebase --json
 `
 
-const issueHelp = `Create an issue.
+const issueHelp = `Manage issues.
 
 USAGE
-  loom issue --title <text> (--body <text> | --body-file <file>) [flags]
+  loom issue <subcommand> [flags]
+
+SUBCOMMANDS
+  create                Create an issue
+  close                 Close an issue
+
+ALIASES
+  Legacy single-token aliases remain supported:
+  issue-close
+
+EXAMPLES
+  loom help issue create
+  loom issue create --title "Tracking bug" --body "Details"
+  loom issue close --issue <issue-number> --reason completed
+`
+
+const issueCreateHelp = `Create an issue.
+
+USAGE
+  loom issue create --title <text> (--body <text> | --body-file <file>) [flags]
 
 FLAGS
   --repo <owner/name>     Repository (default: current git remote)
@@ -392,14 +403,14 @@ OUTPUT
   JSON mode returns action, issue, url, state, and title.
 
 EXAMPLES
-  loom issue --title "Tracking bug" --body "Details"
-  loom issue --repo oinoom/loom --title "Backlog task" --body-file /tmp/issue.md --labels bug,docs --json
+  loom issue create --title "Tracking bug" --body "Details"
+  loom issue create --repo <owner/repo> --title "Backlog task" --body-file /tmp/issue.md --labels bug,docs --json
 `
 
 const issueCloseHelp = `Close an issue.
 
 USAGE
-  loom issue-close --issue <number> [flags]
+  loom issue close --issue <number> [flags]
 
 FLAGS
   --repo <owner/name>     Repository (default: current git remote)
@@ -411,14 +422,34 @@ OUTPUT
   JSON mode returns action, issue, url, state, title, and reason when present.
 
 EXAMPLES
-  loom issue-close --issue 101
-  loom issue-close --repo oinoom/loom --issue 101 --reason completed --json
+  loom issue close --issue <issue-number>
+  loom issue close --repo <owner/repo> --issue <issue-number> --reason completed --json
+`
+
+const prHelp = `Manage pull requests.
+
+USAGE
+  loom pr <subcommand> [flags]
+
+SUBCOMMANDS
+  create                Create a pull request
+  edit                  Edit a pull request
+  merge                 Merge a pull request
+
+ALIASES
+  Legacy single-token aliases remain supported:
+  pr-create, pr-edit, merge
+
+EXAMPLES
+  loom help pr create
+  loom pr create --head <head-branch> --base <base-branch> --title "Ship it" --body "Summary"
+  loom pr merge --pr <pr-number> --method squash
 `
 
 const prCreateHelp = `Create a pull request.
 
 USAGE
-  loom pr-create --title <text> (--body <text> | --body-file <file>) [flags]
+  loom pr create --title <text> (--body <text> | --body-file <file>) [flags]
 
 FLAGS
   --repo <owner/name>     Repository (default: current git remote)
@@ -437,14 +468,14 @@ OUTPUT
   JSON mode returns action, pr, url, state, title, and draft.
 
 EXAMPLES
-  loom pr-create --title "Ship it" --body "Summary"
-  loom pr-create --repo oinoom/loom --head feat/work --base main --title "Ship it" --body-file /tmp/pr.md --draft --json
+  loom pr create --title "Ship it" --body "Summary"
+  loom pr create --repo <owner/repo> --head <head-branch> --base <base-branch> --title "Ship it" --body-file /tmp/pr.md --draft --json
 `
 
 const prEditHelp = `Edit a pull request.
 
 USAGE
-  loom pr-edit --pr <number> [flags]
+  loom pr edit --pr <number> [flags]
 
 FLAGS
   --repo <owner/name>     Repository (default: current git remote)
@@ -462,8 +493,27 @@ OUTPUT
   JSON mode returns action, pr, url, state, and title.
 
 EXAMPLES
-  loom pr-edit --pr 24 --title "Updated title"
-  loom pr-edit --repo oinoom/loom --pr 24 --body-file /tmp/pr.md --base release --json
+  loom pr edit --pr <pr-number> --title "Updated title"
+  loom pr edit --repo <owner/repo> --pr <pr-number> --body-file /tmp/pr.md --base <base-branch> --json
+`
+
+const threadHelp = `Manage pull request review threads.
+
+USAGE
+  loom thread <subcommand> [flags]
+
+SUBCOMMANDS
+  resolve               Resolve a review thread
+  unresolve             Re-open a review thread
+
+ALIASES
+  Legacy single-token aliases remain supported:
+  resolve, unresolve
+
+EXAMPLES
+  loom help thread resolve
+  loom thread resolve --thread-id <thread-id>
+  loom thread unresolve --repo <owner/repo> --pr <pr-number> --comment-id <comment-id>
 `
 
 const listThreadsQuery = `
@@ -672,40 +722,80 @@ func wantsCommandHelp(args []string) bool {
 	return len(args) == 1 && isHelpToken(args[0])
 }
 
+func canonicalCommandPath(cmd string) string {
+	path := strings.Join(strings.Fields(strings.TrimSpace(cmd)), " ")
+	switch path {
+	case "ls":
+		return "list"
+	case "comment-top":
+		return "comment top"
+	case "comment-inline":
+		return "comment inline"
+	case "comment-file":
+		return "comment file"
+	case "edit":
+		return "comment edit"
+	case "delete":
+		return "comment delete"
+	case "reply":
+		return "comment reply"
+	case "issue-close":
+		return "issue close"
+	case "pr-create":
+		return "pr create"
+	case "pr-edit":
+		return "pr edit"
+	case "merge":
+		return "pr merge"
+	case "resolve":
+		return "thread resolve"
+	case "unresolve":
+		return "thread unresolve"
+	default:
+		return path
+	}
+}
+
 func commandHelpText(cmd string) (string, bool) {
-	switch strings.TrimSpace(cmd) {
-	case "list", "ls":
+	switch canonicalCommandPath(cmd) {
+	case "list":
 		return listHelp, true
 	case "find":
 		return findHelp, true
 	case "comment":
 		return commentHelp, true
-	case "comment-top":
+	case "comment top":
 		return commentTopHelp, true
-	case "comment-inline":
+	case "comment inline":
 		return commentInlineHelp, true
-	case "comment-file":
+	case "comment file":
 		return commentFileHelp, true
-	case "edit":
+	case "comment edit":
 		return editHelp, true
-	case "delete":
+	case "comment delete":
 		return deleteHelp, true
-	case "reply":
+	case "comment reply":
 		return replyHelp, true
 	case "issue":
 		return issueHelp, true
-	case "issue-close":
+	case "issue create":
+		return issueCreateHelp, true
+	case "issue close":
 		return issueCloseHelp, true
-	case "pr-create":
+	case "pr":
+		return prHelp, true
+	case "pr create":
 		return prCreateHelp, true
-	case "pr-edit":
+	case "pr edit":
 		return prEditHelp, true
-	case "resolve":
-		return resolveHelp, true
-	case "unresolve":
-		return unresolveHelp, true
-	case "merge":
+	case "pr merge":
 		return mergeHelp, true
+	case "thread":
+		return threadHelp, true
+	case "thread resolve":
+		return resolveHelp, true
+	case "thread unresolve":
+		return unresolveHelp, true
 	default:
 		return "", false
 	}
@@ -729,7 +819,7 @@ func main() {
 	args := os.Args[2:]
 
 	if isHelpToken(cmd) {
-		if len(args) > 0 && printCommandHelp(args[0]) {
+		if len(args) > 0 && printCommandHelp(strings.Join(args, " ")) {
 			return
 		}
 		fmt.Print(usage)
@@ -743,13 +833,13 @@ func main() {
 	case "find":
 		err = runFind(args)
 	case "comment":
-		err = runComment(args, "comment", "")
+		err = runCommentGroup(args)
 	case "comment-top":
-		err = runComment(args, "comment-top", "")
+		err = runComment(args, "comment top", "")
 	case "comment-inline":
-		err = runComment(args, "comment-inline", "")
+		err = runComment(args, "comment inline", "")
 	case "comment-file":
-		err = runComment(args, "comment-file", "file")
+		err = runComment(args, "comment file", "file")
 	case "edit":
 		err = runEdit(args)
 	case "delete":
@@ -757,17 +847,21 @@ func main() {
 	case "reply":
 		err = runReply(args)
 	case "issue":
-		err = runIssue(args)
+		err = runIssueGroup(args)
 	case "issue-close":
 		err = runIssueClose(args)
+	case "pr":
+		err = runPRGroup(args)
 	case "pr-create":
 		err = runPRCreate(args)
 	case "pr-edit":
 		err = runPREdit(args)
+	case "thread":
+		err = runThreadGroup(args)
 	case "resolve":
-		err = runResolve(args, "resolve", false)
+		err = runResolve(args, "thread resolve", false)
 	case "unresolve":
-		err = runResolve(args, "unresolve", true)
+		err = runResolve(args, "thread unresolve", true)
 	case "merge":
 		err = runMerge(args)
 	default:
@@ -777,6 +871,108 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
+	}
+}
+
+func runCommentGroup(args []string) error {
+	if len(args) == 0 || wantsCommandHelp(args) {
+		fmt.Print(commentHelp)
+		return nil
+	}
+	if isHelpToken(args[0]) {
+		if len(args) > 1 && printCommandHelp("comment "+strings.Join(args[1:], " ")) {
+			return nil
+		}
+		fmt.Print(commentHelp)
+		return nil
+	}
+
+	switch args[0] {
+	case "top":
+		return runComment(args[1:], "comment top", "")
+	case "inline":
+		return runComment(args[1:], "comment inline", "")
+	case "file":
+		return runComment(args[1:], "comment file", "file")
+	case "edit":
+		return runEdit(args[1:])
+	case "delete":
+		return runDelete(args[1:])
+	case "reply":
+		return runReply(args[1:])
+	default:
+		return fmt.Errorf("unknown comment subcommand %q", args[0])
+	}
+}
+
+func runIssueGroup(args []string) error {
+	if len(args) == 0 || wantsCommandHelp(args) {
+		fmt.Print(issueHelp)
+		return nil
+	}
+	if isHelpToken(args[0]) {
+		if len(args) > 1 && printCommandHelp("issue "+strings.Join(args[1:], " ")) {
+			return nil
+		}
+		fmt.Print(issueHelp)
+		return nil
+	}
+
+	switch args[0] {
+	case "create":
+		return runIssue(args[1:])
+	case "close":
+		return runIssueClose(args[1:])
+	default:
+		return fmt.Errorf("unknown issue subcommand %q", args[0])
+	}
+}
+
+func runPRGroup(args []string) error {
+	if len(args) == 0 || wantsCommandHelp(args) {
+		fmt.Print(prHelp)
+		return nil
+	}
+	if isHelpToken(args[0]) {
+		if len(args) > 1 && printCommandHelp("pr "+strings.Join(args[1:], " ")) {
+			return nil
+		}
+		fmt.Print(prHelp)
+		return nil
+	}
+
+	switch args[0] {
+	case "create":
+		return runPRCreate(args[1:])
+	case "edit":
+		return runPREdit(args[1:])
+	case "merge":
+		return runMerge(args[1:])
+	default:
+		return fmt.Errorf("unknown pr subcommand %q", args[0])
+	}
+}
+
+func runThreadGroup(args []string) error {
+	if len(args) == 0 || wantsCommandHelp(args) {
+		fmt.Print(threadHelp)
+		return nil
+	}
+	if isHelpToken(args[0]) {
+		if len(args) > 1 && printCommandHelp("thread "+strings.Join(args[1:], " ")) {
+			return nil
+		}
+		fmt.Print(threadHelp)
+		return nil
+	}
+
+	switch args[0] {
+	case "resolve":
+		return runResolve(args[1:], "thread resolve", false)
+	case "unresolve":
+		return runResolve(args[1:], "thread unresolve", true)
+	default:
+		return fmt.Errorf("unknown thread subcommand %q", args[0])
 	}
 }
 
@@ -1201,7 +1397,7 @@ func runReply(args []string) error {
 
 func runIssue(args []string) error {
 	if wantsCommandHelp(args) {
-		fmt.Print(issueHelp)
+		fmt.Print(issueCreateHelp)
 		return nil
 	}
 	fs := newFlagSet("issue")

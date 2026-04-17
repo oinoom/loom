@@ -20,27 +20,27 @@
 Discover command-specific help before acting when the workflow is unfamiliar:
 
 - `loom help list`
-- `loom help comment-inline`
-- `loom resolve --help`
+- `loom help comment inline`
+- `loom thread resolve --help`
 
 Always pass explicit flags and prefer JSON output when available:
 
 - `loom list --repo <owner/repo> --pr <n> --state unresolved --format json`
 - `loom list --repo <owner/repo> --pr <n> --query "<needle>" --format json`
-- `loom comment-top --repo <owner/repo> --pr <n> --body "<text>" --json`
-- `loom comment-inline --repo <owner/repo> --pr <n> --path <file> --line <n> --side RIGHT --body "<text>" --json`
-- `loom comment-inline --repo <owner/repo> --pr <n> --path <file> --start-line <n> --start-side RIGHT --line <n> --side RIGHT --body "<text>" --json`
-- `loom comment-file --repo <owner/repo> --pr <n> --path <file> --body "<text>" --json`
-- `loom edit --repo <owner/repo> --comment-id <id-or-url> --body "<text>" --json`
-- `loom delete --repo <owner/repo> --comment-id <id-or-url> --json`
-- `loom issue --repo <owner/repo> --title "<text>" --body "<text>" --json`
-- `loom issue-close --repo <owner/repo> --issue <n> [--reason completed|not_planned] --json`
-- `loom pr-create --repo <owner/repo> --head <branch> --base <branch> --title "<text>" --body "<text>" --json`
-- `loom pr-edit --repo <owner/repo> --pr <n> [--title "<text>"] [--body "<text>"] [--base <branch>] --json`
-- `loom reply --repo <owner/repo> --pr <n> --comment-id <id-or-url> --body "<text>" --json`
-- `loom resolve --thread-id <PRRT_...> --json`
-- `loom resolve --repo <owner/repo> --pr <n> --comment-id <id-or-url> --json`
-- `loom merge --repo <owner/repo> --pr <n> --method squash --json`
+- `loom comment top --repo <owner/repo> --pr <n> --body "<text>" --json`
+- `loom comment inline --repo <owner/repo> --pr <n> --path <file> --line <n> --side RIGHT --body "<text>" --json`
+- `loom comment inline --repo <owner/repo> --pr <n> --path <file> --start-line <n> --start-side RIGHT --line <n> --side RIGHT --body "<text>" --json`
+- `loom comment file --repo <owner/repo> --pr <n> --path <file> --body "<text>" --json`
+- `loom comment edit --repo <owner/repo> --comment-id <id-or-url> --body "<text>" --json`
+- `loom comment delete --repo <owner/repo> --comment-id <id-or-url> --json`
+- `loom issue create --repo <owner/repo> --title "<text>" --body "<text>" --json`
+- `loom issue close --repo <owner/repo> --issue <n> [--reason completed|not_planned] --json`
+- `loom pr create --repo <owner/repo> --head <branch> --base <branch> --title "<text>" --body "<text>" --json`
+- `loom pr edit --repo <owner/repo> --pr <n> [--title "<text>"] [--body "<text>"] [--base <branch>] --json`
+- `loom comment reply --repo <owner/repo> --pr <n> --comment-id <id-or-url> --body "<text>" --json`
+- `loom thread resolve --thread-id <PRRT_...> --json`
+- `loom thread resolve --repo <owner/repo> --pr <n> --comment-id <id-or-url> --json`
+- `loom pr merge --repo <owner/repo> --pr <n> --method squash --json`
 
 ## Automation-friendly flow
 
@@ -52,37 +52,37 @@ loom list --repo ryuvel/tacara --pr 24 --state unresolved --format json > /tmp/t
 loom list --repo ryuvel/tacara --pr 24 --state unresolved --severity critical --path tacara-core/src --format json
 
 # 3) Leave a top-level PR note
-loom comment-top --repo ryuvel/tacara --pr 24 --body "Overall review note" --json
+loom comment top --repo ryuvel/tacara --pr 24 --body "Overall review note" --json
 
 # 4) Leave an inline review comment
-loom comment-inline --repo ryuvel/tacara --pr 24 --path README.md --line 14 --side RIGHT --body "This line needs clarification." --json
+loom comment inline --repo ryuvel/tacara --pr 24 --path README.md --line 14 --side RIGHT --body "This line needs clarification." --json
 
 # 5) Correct a mistaken comment in place
-loom edit --repo ryuvel/tacara --comment-id 2857259586 --body "This is the corrected wording." --json
+loom comment edit --repo ryuvel/tacara --comment-id 2857259586 --body "This is the corrected wording." --json
 
 # 6) Reply with a commit URL
-loom reply --repo ryuvel/tacara --pr 24 --comment-id 2857259586 --body "Addressed in https://github.com/owner/repo/commit/<sha>" --json
+loom comment reply --repo ryuvel/tacara --pr 24 --comment-id 2857259586 --body "Addressed in https://github.com/owner/repo/commit/<sha>" --json
 
 # 7) Resolve by thread node ID
-loom resolve --thread-id PRRT_kwDORR607s5w3N_2 --json
+loom thread resolve --thread-id PRRT_kwDORR607s5w3N_2 --json
 
 # 8) Delete a stray top-level or review comment if needed
-loom delete --repo ryuvel/tacara --comment-id 2857259586 --json
+loom comment delete --repo ryuvel/tacara --comment-id 2857259586 --json
 
 # 9) Open a tracking issue if the bug belongs outside the PR
-loom issue --repo ryuvel/tacara --title "Follow-up bug" --body "Detailed repro." --json
+loom issue create --repo ryuvel/tacara --title "Follow-up bug" --body "Detailed repro." --json
 
 # 10) Close the issue when resolved
-loom issue-close --repo ryuvel/tacara --issue 101 --reason completed --json
+loom issue close --repo ryuvel/tacara --issue 101 --reason completed --json
 
 # 11) Open the PR itself from loom if needed
-loom pr-create --repo ryuvel/tacara --head feat/work --base main --title "Ship it" --body "Summary" --json
+loom pr create --repo ryuvel/tacara --head feat/work --base main --title "Ship it" --body "Summary" --json
 
 # 12) Edit the PR if the title or body needs cleanup
-loom pr-edit --repo ryuvel/tacara --pr 24 --title "Updated title" --body "Updated summary" --json
+loom pr edit --repo ryuvel/tacara --pr 24 --title "Updated title" --body "Updated summary" --json
 
 # 13) Merge when review state is clean
-loom merge --repo ryuvel/tacara --pr 24 --method squash --json
+loom pr merge --repo ryuvel/tacara --pr 24 --method squash --json
 
 # 14) Verify empty unresolved queue
 loom list --repo ryuvel/tacara --pr 24 --state unresolved --format json

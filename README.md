@@ -59,8 +59,8 @@ Command discovery:
 
 ```bash
 loom help list
-loom comment-inline --help
-loom resolve --help
+loom help comment inline
+loom thread resolve --help
 ```
 
 ## Install Agent Skill
@@ -103,107 +103,108 @@ loom list --repo <owner/repo> --pr <pr-number> --state unresolved --stats --form
 Comment on a PR:
 
 ```bash
-loom comment-top --repo <owner/repo> --pr <pr-number> --body "Top-level PR note"
+loom comment top --repo <owner/repo> --pr <pr-number> --body "Top-level PR note"
 ```
 
 Comment on one diff line:
 
 ```bash
-loom comment-inline --repo <owner/repo> --pr <pr-number> --path <path/to/file> --line <line-number> --side RIGHT --body "Please rename this."
+loom comment inline --repo <owner/repo> --pr <pr-number> --path <path/to/file> --line <line-number> --side RIGHT --body "Please rename this."
 ```
 
 Comment on a diff line range:
 
 ```bash
-loom comment-inline --repo <owner/repo> --pr <pr-number> --path <path/to/file> --start-line <start-line> --start-side RIGHT --line <end-line> --side RIGHT --body "This section needs more detail."
+loom comment inline --repo <owner/repo> --pr <pr-number> --path <path/to/file> --start-line <start-line> --start-side RIGHT --line <end-line> --side RIGHT --body "This section needs more detail."
 ```
 
 Comment on a whole file in the PR:
 
 ```bash
-loom comment-file --repo <owner/repo> --pr <pr-number> --path <path/to/file> --body "This file needs an inline usage example."
+loom comment file --repo <owner/repo> --pr <pr-number> --path <path/to/file> --body "This file needs an inline usage example."
 ```
 
 Edit an existing PR comment:
 
 ```bash
-loom edit --repo <owner/repo> --comment-id <comment-id> --body "Updated wording"
+loom comment edit --repo <owner/repo> --comment-id <comment-id> --body "Updated wording"
 ```
 
 Delete an existing PR comment:
 
 ```bash
-loom delete --repo <owner/repo> --comment-id <comment-id>
+loom comment delete --repo <owner/repo> --comment-id <comment-id>
 ```
 
 Create an issue:
 
 ```bash
-loom issue --repo <owner/repo> --title "Tracking bug" --body "Details"
+loom issue create --repo <owner/repo> --title "Tracking bug" --body "Details"
 ```
 
 Close an issue:
 
 ```bash
-loom issue-close --repo <owner/repo> --issue <issue-number> --reason completed
+loom issue close --repo <owner/repo> --issue <issue-number> --reason completed
 ```
 
 Open a pull request:
 
 ```bash
-loom pr-create --repo <owner/repo> --head <head-branch> --base <base-branch> --title "Ship it" --body "Summary"
+loom pr create --repo <owner/repo> --head <head-branch> --base <base-branch> --title "Ship it" --body "Summary"
 ```
 
 Edit a pull request:
 
 ```bash
-loom pr-edit --repo <owner/repo> --pr <pr-number> --title "Updated title" --body "Updated summary"
+loom pr edit --repo <owner/repo> --pr <pr-number> --title "Updated title" --body "Updated summary"
 ```
 
 Merge a PR:
 
 ```bash
-loom merge --repo <owner/repo> --pr <pr-number> --method squash
+loom pr merge --repo <owner/repo> --pr <pr-number> --method squash
 ```
 
 Reply to a review comment:
 
 ```bash
-loom reply --repo <owner/repo> --pr <pr-number> --comment-id <comment-id> --body "Addressed in <commit-url>"
+loom comment reply --repo <owner/repo> --pr <pr-number> --comment-id <comment-id> --body "Addressed in <commit-url>"
 ```
 
 Resolve / unresolve a thread:
 
 ```bash
-loom resolve --thread-id <thread-id>
-loom unresolve --thread-id <thread-id>
+loom thread resolve --thread-id <thread-id>
+loom thread unresolve --thread-id <thread-id>
 ```
 
 Resolve a thread from a review comment URL:
 
 ```bash
-loom resolve --repo <owner/repo> --pr <pr-number> --comment "https://github.com/<owner>/<repo>/pull/<pr-number>#discussion_r<comment-id>"
+loom thread resolve --repo <owner/repo> --pr <pr-number> --comment-id "https://github.com/<owner>/<repo>/pull/<pr-number>#discussion_r<comment-id>"
 ```
 
 Machine-readable output:
 
 ```bash
 loom list --repo <owner/repo> --pr <pr-number> --state all --format jsonl
-loom comment-top --repo <owner/repo> --pr <pr-number> --body "Top-level PR note" --json
-loom comment-inline --repo <owner/repo> --pr <pr-number> --path <path/to/file> --line <line-number> --side RIGHT --body "Please rename this." --json
-loom edit --repo <owner/repo> --comment-id <comment-id> --body "Updated wording" --json
-loom delete --repo <owner/repo> --comment-id <comment-id> --json
-loom issue --repo <owner/repo> --title "Tracking bug" --body "Details" --json
-loom issue-close --repo <owner/repo> --issue <issue-number> --reason completed --json
-loom pr-create --repo <owner/repo> --head <head-branch> --base <base-branch> --title "Ship it" --body "Summary" --json
-loom pr-edit --repo <owner/repo> --pr <pr-number> --title "Updated title" --body "Updated summary" --json
-loom merge --repo <owner/repo> --pr <pr-number> --method squash --json
-loom reply --repo <owner/repo> --pr <pr-number> --comment-id <comment-id> --body "Addressed in <commit-url>" --json
-loom resolve --thread-id <thread-id> --json
+loom comment top --repo <owner/repo> --pr <pr-number> --body "Top-level PR note" --json
+loom comment inline --repo <owner/repo> --pr <pr-number> --path <path/to/file> --line <line-number> --side RIGHT --body "Please rename this." --json
+loom comment edit --repo <owner/repo> --comment-id <comment-id> --body "Updated wording" --json
+loom comment delete --repo <owner/repo> --comment-id <comment-id> --json
+loom issue create --repo <owner/repo> --title "Tracking bug" --body "Details" --json
+loom issue close --repo <owner/repo> --issue <issue-number> --reason completed --json
+loom pr create --repo <owner/repo> --head <head-branch> --base <base-branch> --title "Ship it" --body "Summary" --json
+loom pr edit --repo <owner/repo> --pr <pr-number> --title "Updated title" --body "Updated summary" --json
+loom pr merge --repo <owner/repo> --pr <pr-number> --method squash --json
+loom comment reply --repo <owner/repo> --pr <pr-number> --comment-id <comment-id> --body "Addressed in <commit-url>" --json
+loom thread resolve --thread-id <thread-id> --json
 ```
 
 Notes:
 
 - `loom find` still works, but `loom list --query ...` is the preferred search form.
 - `--comment-id` and `--thread-id` are the preferred flag names; `--comment` and `--thread` remain supported.
+- Nested subcommands like `loom comment inline` and `loom pr merge` are the preferred command shape; legacy single-token aliases remain supported.
 - `--stats` prints to stderr so it can be used with `--format json` or `--format jsonl` safely.
